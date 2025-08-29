@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ShoppingCart, Package, Clock, CheckCircle, AlertTriangle, Plus, Edit, Trash2, Save } from "lucide-react";
-import { fundService } from "@/lib/fundService";
+import { firestoreService, Transaction } from "@/lib/firestore";
 
 
 // EditItemForm component to handle item editing safely

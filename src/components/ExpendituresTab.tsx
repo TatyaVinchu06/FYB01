@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, TrendingDown, DollarSign, Calendar, TrendingUp, Save, Trash2, Edit } from "lucide-react";
-import { fundService } from "@/lib/fundService";
+import { firestoreService, Transaction } from "@/lib/firestore";
 
 
 interface ExpendituresTabProps {

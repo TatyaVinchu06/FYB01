@@ -66,7 +66,7 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
             >
               <div className="text-center space-y-2">
                 <Users className="w-8 h-8 mx-auto text-accent" />
-                <h3 className="font-rajdhani font-bold">Viewer</h3>
+                <h3 className="font-rajdhani font-bold">Gang Members</h3>
                 <p className="text-xs text-muted-foreground">Read-only access</p>
               </div>
             </Card>
@@ -81,7 +81,7 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
             >
               <div className="text-center space-y-2">
                 <Shield className="w-8 h-8 mx-auto text-warning" />
-                <h3 className="font-rajdhani font-bold">Admin</h3>
+                <h3 className="font-rajdhani font-bold">Leader</h3>
                 <p className="text-xs text-muted-foreground">Full control</p>
               </div>
             </Card>

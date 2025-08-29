@@ -25,7 +25,7 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
 
   const handleLogin = () => {
     const adminPassword = "YK789";
-    const viewerPassword = "SDYK8"; // <-- viewer password
+    const viewerPassword = "takla"; // <-- viewer password
 
     if (selectedMode === "admin" && password === adminPassword) {
       onLogin("admin");

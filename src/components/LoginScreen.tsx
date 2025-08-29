@@ -20,7 +20,7 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
 
   const handleLogin = () => {
     // Simple auth logic - in real app this would be secured
-    if (selectedMode === 'admin' && password === "Taklya") {
+    if (selectedMode === 'admin' && password === "YK789") {
       onLogin('admin');
       onClose();
     } else if (selectedMode === 'viewer') {

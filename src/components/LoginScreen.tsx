@@ -28,7 +28,7 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
   const handleLogin = () => {
     const adminPassword = "YK789";
     const gangMemberPassword = "takla";
-    const viewer2Password = "SDYK8";
+    const viewer2Password = "freedy";
 
     if (selectedMode === "admin" && password === adminPassword) {
       onLogin("admin");
@@ -162,11 +162,6 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
             </Button>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
-  );
-};
-
       </DialogContent>
     </Dialog>
   );

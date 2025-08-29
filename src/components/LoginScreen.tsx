@@ -10,7 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Eye, EyeOff, Shield, Users } from "lucide-react";
-import { UserMode } from "../App";
+
+// Updated UserMode
+export type UserMode = "admin" | "gangmember" | "viewer2";
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -21,17 +23,21 @@ interface LoginModalProps {
 export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<UserMode>("viewer");
+  const [selectedMode, setSelectedMode] = useState<UserMode>("gangmember");
 
   const handleLogin = () => {
     const adminPassword = "YK789";
-    const viewerPassword = "takla"; // <-- viewer password
+    const gangMemberPassword = "takla";
+    const viewer2Password = "freedy";
 
     if (selectedMode === "admin" && password === adminPassword) {
       onLogin("admin");
       onClose();
-    } else if (selectedMode === "viewer" && password === viewerPassword) {
-      onLogin("viewer");
+    } else if (selectedMode === "gangmember" && password === gangMemberPassword) {
+      onLogin("gangmember");
+      onClose();
+    } else if (selectedMode === "viewer2" && password === viewer2Password) {
+      onLogin("viewer2");
       onClose();
     } else {
       alert("Kyaa bee Shaane!! Nikal yaha se");
@@ -55,14 +61,15 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
           </div>
 
           {/* Mode Selection */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
+            {/* Gang Member */}
             <Card
               className={`p-4 cursor-pointer transition-all duration-300 ${
-                selectedMode === "viewer"
+                selectedMode === "gangmember"
                   ? "card-gang border-primary ring-2 ring-primary/50"
                   : "bg-muted hover:bg-muted/80"
               }`}
-              onClick={() => setSelectedMode("viewer")}
+              onClick={() => setSelectedMode("gangmember")}
             >
               <div className="text-center space-y-2">
                 <Users className="w-8 h-8 mx-auto text-accent" />
@@ -71,6 +78,23 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
               </div>
             </Card>
 
+            {/* Guest Viewer (viewer2) */}
+            <Card
+              className={`p-4 cursor-pointer transition-all duration-300 ${
+                selectedMode === "viewer2"
+                  ? "card-gang border-primary ring-2 ring-primary/50"
+                  : "bg-muted hover:bg-muted/80"
+              }`}
+              onClick={() => setSelectedMode("viewer2")}
+            >
+              <div className="text-center space-y-2">
+                <Users className="w-8 h-8 mx-auto text-accent" />
+                <h3 className="font-rajdhani font-bold">Guest Viewers</h3>
+                <p className="text-xs text-muted-foreground">Limited view access</p>
+              </div>
+            </Card>
+
+            {/* Admin */}
             <Card
               className={`p-4 cursor-pointer transition-all duration-300 ${
                 selectedMode === "admin"
@@ -87,10 +111,14 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
             </Card>
           </div>
 
-          {/* Password Input for Both Modes */}
+          {/* Password Input */}
           <div className="space-y-2">
             <Label htmlFor="password" className="text-sm font-rajdhani">
-              {selectedMode === "admin" ? "Admin Password" : "Viewer Key"}{" "}
+              {selectedMode === "admin"
+                ? "Admin Password"
+                : selectedMode === "gangmember"
+                ? "Gang Member Key"
+                : "Viewer 2 Key"}{" "}
               <span className="text-warning">*</span>
             </Label>
             <div className="relative">
@@ -100,7 +128,9 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
                 placeholder={
                   selectedMode === "admin"
                     ? "Enter the gang code..."
-                    : "Enter the viewer key..."
+                    : selectedMode === "gangmember"
+                    ? "Enter the gang member key..."
+                    : "Enter the viewer 2 key..."
                 }
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -132,6 +162,11 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
             </Button>
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
       </DialogContent>
     </Dialog>
   );

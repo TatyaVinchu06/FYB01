@@ -141,16 +141,19 @@ function App() {
         )}
 
       {/* Footer */}
-        {userMode && (
-          <footer className="bg-black/30 backdrop-blur-sm border-t border-purple-500/20 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="text-center text-purple-300 text-sm">
+        {/* Footer */}
+      {userMode && (
+        <footer className="bg-black/30 backdrop-blur-sm border-t border-purple-500/20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center text-sm text-purple-300">
             <p>🔮 Forever Young Brotherhood | Keep it 💯 | Don't snitch! 🕶️</p>
+            <p className="text-purple-400 text-right">
+              Created By Tatya Vinchu <span className="text-purple-300">(@Om006)</span>
+            </p>
           </div>
-        </div>
-      </footer>
-        )}
+        </footer>
+      )}
     </div>
+
       
       <Toaster />
     </>

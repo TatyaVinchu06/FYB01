@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { ShoppingCart, Package, Clock, CheckCircle, AlertTriangle, Plus, Edit, Trash2, Save } from "lucide-react";
 import { firestoreService, Transaction } from "@/lib/firestore";
 
-
 // EditItemForm component to handle item editing safely
 interface EditItemFormProps {
   item: Item;
@@ -69,6 +68,17 @@ interface OrdersTabProps {
 }
 
 export const OrdersTab = ({ isAdmin }: OrdersTabProps) => {
+  // If user is not admin, show access denied message and stop rendering further UI
+  if (!isAdmin) {
+    return (
+      <div className="p-8 text-center text-muted-foreground">
+        <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+        <p>You do not have permission to view this content.</p>
+        <p className="mt-2">Please contact an administrator for access.</p>
+      </div>
+    );
+  }
+
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -109,7 +119,6 @@ export const OrdersTab = ({ isAdmin }: OrdersTabProps) => {
       unsubscribeOrders();
     };
   }, [newOrder.selectedItemId]);
-
   const placeOrder = async () => {
     if (newOrder.memberName.trim() && newOrder.selectedItemId) {
       const selectedItem = availableItems.find(item => item.id === newOrder.selectedItemId);
@@ -293,7 +302,7 @@ export const OrdersTab = ({ isAdmin }: OrdersTabProps) => {
                         ${item.price}
                       </div>
                     )}
-                    {isAdmin && editingItem !== item.id && (
+                    {editingItem !== item.id && (
                       <div className="flex gap-1">
                         <Button
                           size="sm"
@@ -320,39 +329,37 @@ export const OrdersTab = ({ isAdmin }: OrdersTabProps) => {
           </div>
           
           {/* Add New Item (Admin Only) */}
-          {isAdmin && (
-            <Card className="border-dashed border-2 border-border/50">
-              <CardContent className="p-4">
-                <h4 className="font-rajdhani font-bold mb-3 text-gang-glow">Add New Item</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Card className="border-dashed border-2 border-border/50">
+            <CardContent className="p-4">
+              <h4 className="font-rajdhani font-bold mb-3 text-gang-glow">Add New Item</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <Input
+                  placeholder="Item name"
+                  value={newItem.name}
+                  onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                  className="bg-input"
+                />
+                <Input
+                  placeholder="Description"
+                  value={newItem.description}
+                  onChange={(e) => setNewItem({...newItem, description: e.target.value})}
+                  className="bg-input"
+                />
+                <div className="flex gap-2">
                   <Input
-                    placeholder="Item name"
-                    value={newItem.name}
-                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                    className="bg-input"
+                    type="number"
+                    placeholder="Price"
+                    value={newItem.price}
+                    onChange={(e) => setNewItem({...newItem, price: e.target.value})}
+                    className="bg-input flex-1"
                   />
-                  <Input
-                    placeholder="Description"
-                    value={newItem.description}
-                    onChange={(e) => setNewItem({...newItem, description: e.target.value})}
-                    className="bg-input"
-                  />
-                  <div className="flex gap-2">
-                    <Input
-                      type="number"
-                      placeholder="Price"
-                      value={newItem.price}
-                      onChange={(e) => setNewItem({...newItem, price: e.target.value})}
-                      className="bg-input flex-1"
-                    />
-                    <Button onClick={addItem} className="btn-gang">
-                      <Plus className="w-4 h-4" />
-                    </Button>
-                  </div>
+                  <Button onClick={addItem} className="btn-gang">
+                    <Plus className="w-4 h-4" />
+                  </Button>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </CardContent>
+          </Card>
         </CardContent>
       </Card>
 
@@ -379,29 +386,24 @@ export const OrdersTab = ({ isAdmin }: OrdersTabProps) => {
             >
               {availableItems.map(item => (
                 <option key={item.id} value={item.id}>
-                  {item.name} - ${item.price}
+                  {item.name} (${item.price})
                 </option>
               ))}
             </select>
-            
+
             <Input
               type="number"
-              min="1"
-              max="10"
+              min={1}
+              placeholder="Quantity"
               value={newOrder.quantity}
-              onChange={(e) => setNewOrder({...newOrder, quantity: parseInt(e.target.value) || 1})}
+              onChange={(e) => setNewOrder({...newOrder, quantity: Number(e.target.value) || 1})}
               className="bg-input"
             />
-            
+
             <Button onClick={placeOrder} className="btn-gang">
               <ShoppingCart className="w-4 h-4 mr-2" />
               Place Order
             </Button>
-          </div>
-          
-          <div className="text-sm text-muted-foreground flex items-center gap-1">
-            <AlertTriangle className="w-4 h-4" />
-            Don't snitch about our shopping! 🕶️
           </div>
         </CardContent>
       </Card>
@@ -409,71 +411,75 @@ export const OrdersTab = ({ isAdmin }: OrdersTabProps) => {
       {/* Orders List */}
       <Card className="card-gang">
         <CardHeader>
-          <CardTitle className="font-orbitron text-gang-glow">
-            📦 Order History & Status
-          </CardTitle>
+          <CardTitle className="font-orbitron text-gang-glow">Orders</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {orders.map((order) => (
+        <CardContent className="space-y-4">
+          {orders.length === 0 ? (
+            <p className="text-muted-foreground text-center">No orders placed yet.</p>
+          ) : (
+            orders.map(order => (
               <div
                 key={order.id}
-                className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                className="p-4 border border-border rounded-lg bg-muted/50"
               >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-rajdhani font-bold">
-                      {order.memberName} - {order.items[0]?.quantity || 1}x {order.items[0]?.itemName || 'Unknown Item'}
-                    </h3>
-                    {getStatusBadge(order.status)}
+                <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
+                  <div className="font-bold font-rajdhani text-lg text-success">
+                    {order.memberName}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Ordered: {new Date(order.orderDate).toLocaleDateString()}
-                  </p>
+                  <div>{getStatusBadge(order.status)}</div>
+                </div>
+                <div className="mb-2">
+                  <ul className="list-disc list-inside">
+                    {order.items.map(item => (
+                      <li key={item.itemId} className="font-rajdhani font-medium">
+                        {item.itemName} × {item.quantity} (${(item.price * item.quantity).toFixed(2)})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="text-right font-orbitron font-bold text-lg text-gang-glow">
+                  Total: ${order.totalAmount.toFixed(2)}
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="text-xl font-orbitron font-bold text-success">
-                    ${order.totalAmount}
-                  </div>
-                  
-                  {isAdmin && order.status !== 'completed' && (
-                    <div className="flex gap-2">
-                      {order.status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateOrderStatus(order.id, 'approved')}
-                          className="btn-gang-outline"
-                        >
-                          Approve
-                        </Button>
-                      )}
-                      {order.status === 'approved' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateOrderStatus(order.id, 'completed')}
-                          className="bg-success hover:bg-success/80 text-background"
-                        >
-                          Complete
-                        </Button>
-                      )}
-                    </div>
+                {/* Controls to update status */}
+                <div className="mt-3 flex gap-2 flex-wrap">
+                  {order.status === "pending" && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="btn-gang-outline"
+                        onClick={() => updateOrderStatus(order.id, "approved")}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => updateOrderStatus(order.id, "cancelled")}
+                      >
+                        Cancel
+                      </Button>
+                    </>
+                  )}
+
+                  {order.status === "approved" && (
+                    <Button
+                      size="sm"
+                      variant="success"
+                      onClick={() => updateOrderStatus(order.id, "completed")}
+                    >
+                      Complete
+                    </Button>
                   )}
                 </div>
               </div>
-            ))}
-          </div>
-
-          {orders.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <ShoppingCart className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No orders placed yet. Time to gear up! 🔫</p>
-            </div>
+            ))
           )}
         </CardContent>
       </Card>
     </div>
   );
 };
+
+

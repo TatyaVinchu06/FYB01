@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 40% 98%;
+    --primary-glow: 262.1 83.3% 67.8%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 262.1 83.3% 57.8%;
+    --radius: 0.75rem;
+    
+    /* Gang-specific colors */
+    --gang-purple: 262.1 83.3% 57.8%;
+    --gang-purple-dark: 262.1 83.3% 47.8%;
+    --gang-neon: 280 100% 70%;
+    --gang-dark: 222.2 84% 4.9%;
+    --gang-card: 217.2 32.6% 17.5%;
+    --success: 142.1 76.2% 36.3%;
+    --warning: 47.9 95.8% 53.1%;
+    
+    /* Shadows and glows */
+    --shadow-gang: 0 10px 25px -5px rgba(139, 92, 246, 0.3);
+    --shadow-neon: 0 0 20px rgba(196, 181, 253, 0.5);
+    --glow-purple: 0 0 30px rgba(139, 92, 246, 0.4);
+    
+    /* Sidebar */
+    --sidebar-background: 222.2 84% 4.9%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 262.1 83.3% 57.8%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 217.2 32.6% 17.5%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 217.2 32.6% 17.5%;
+    --sidebar-ring: 262.1 83.3% 57.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Rajdhani', sans-serif;
+  }
+}
+
+@layer components {
+  .card-gang {
+    @apply bg-gang-card/50 backdrop-blur-sm border-border/50 shadow-gang;
+  }
+  
+  .btn-gang {
+    @apply bg-gang-purple hover:bg-gang-purple-dark text-white font-rajdhani font-semibold shadow-lg hover:shadow-neon transition-all duration-300;
+  }
+  
+  .btn-gang-outline {
+    @apply border-gang-purple text-gang-purple hover:bg-gang-purple/10 font-rajdhani font-semibold transition-all duration-300;
+  }
+  
+  .text-gang-glow {
+    @apply text-gang-neon;
+    text-shadow: 0 0 10px rgba(196, 181, 253, 0.5);
+  }
+}

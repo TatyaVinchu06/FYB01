@@ -25,9 +25,9 @@ function App() {
     setActiveTab('members');
   };
   const tabs = [
-    { id: 'members', label: '👥 Gang Members', icon: Users },
-    { id: 'expenditures', label: '💸 Money Moves', icon: DollarSign },
-    { id: 'orders', label: '🔫 Arsenal Orders', icon: ShoppingCart },
+    { id: 'members', label: 'Gang Members', icon: Users },
+    { id: 'expenditures', label: 'Money Moves', icon: DollarSign },
+    { id: 'orders', label: 'Arsenal Orders', icon: ShoppingCart },
   ];
 
   const isAdmin = userMode === 'admin';

@@ -132,9 +132,6 @@ export const LoginModal = ({ isOpen, onClose, onLogin }: LoginModalProps) => {
             </Button>
           </div>
         </div>
-         <div className="absolute bottom-2 right-4 text-xs text-muted-foreground italic">
-    Created by Tatya Vinchu (@Om006)
-  </div>
       </DialogContent>
     </Dialog>
   );

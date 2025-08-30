@@ -54,7 +54,7 @@ function App() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold text-white">FYB Gang System</h1>
-                  <p className="text-xs text-purple-300">Forever Young Brotherhood</p>
+                  <p className="text-xs text-purple-300">Loyalty meets street</p>
                 </div>
               </div>
             </div>
@@ -64,7 +64,7 @@ function App() {
                 {isAdmin ? (
                   <>
                     <Shield className="w-4 h-4 text-yellow-400" />
-                    <span className="text-sm font-medium text-yellow-400">Boss Mode</span>
+                    <span className="text-sm font-medium text-yellow-400">Management</span>
                   </>
                 ) : (
                   <>
@@ -145,7 +145,7 @@ function App() {
       {userMode && (
         <footer className="bg-black/30 backdrop-blur-sm border-t border-purple-500/20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center text-sm text-purple-300">
-            <p>🔮 Forever Young Brotherhood | Keep it 💯 | Don't snitch! 🕶️</p>
+            <p>Loyalty meets street | Never give up 🔥 | StorymodeByChoice 💯💜</p>
             <p className="text-purple-400 text-right">
               Created By Tatya Vinchu <span className="text-purple-300">(@Om006)</span>
             </p>

@@ -63,13 +63,49 @@ const EditItemForm = ({ item, onSave, onCancel }: EditItemFormProps) => {
   );
 };
 
+type UserMode = "admin" | "gangmember" | "viewer2";
+
 interface OrdersTabProps {
-  isAdmin: boolean;
+  userMode?: UserMode | null;
 }
 
-export const OrdersTab = ({ userMode }: OrdersTabProps) => {
-  // If user is "viewer2", show access denied message and stop rendering further UI
-  if (userMode === "viewer2") {
+function readRoleFallback(): UserMode | null {
+  try {
+    // 1) prop missing? try localStorage
+    const ls = typeof window !== "undefined" ? localStorage.getItem("app.role") : null;
+    if (typeof ls === "string") {
+      const v = ls.trim().toLowerCase();
+      if (v === "admin" || v === "gangmember" || v === "viewer2") return v as UserMode;
+    }
+    // 2) try query string ?role=admin
+    if (typeof window !== "undefined") {
+      const qs = new URLSearchParams(window.location.search);
+      const q = qs.get("role");
+      if (typeof q === "string") {
+        const v = q.trim().toLowerCase();
+        if (v === "admin" || v === "gangmember" || v === "viewer2") return v as UserMode;
+      }
+    }
+  } catch {}
+  return null;
+}
+
+export const OrdersTab = (props: OrdersTabProps) => {
+  const raw = props?.userMode ?? null;
+  const normalizedFromProp =
+    typeof raw === "string" ? (raw.trim().toLowerCase() as UserMode) : null;
+  const fallback = normalizedFromProp ?? readRoleFallback();
+
+  if (typeof window !== "undefined") {
+    // eslint-disable-next-line no-console
+    console.debug("[OrdersTab] mode prop =", raw, "normalized =", normalizedFromProp, "fallback =", fallback);
+  }
+
+  const mode: UserMode | null = fallback;
+
+  // Only admin can access
+  const isAllowed = mode === "admin";
+  if (!isAllowed) {
     return (
       <div className="p-8 text-center text-muted-foreground">
         <h2 className="text-2xl font-bold mb-4">Access Denied</h2>

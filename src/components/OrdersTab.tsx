@@ -67,9 +67,9 @@ interface OrdersTabProps {
   isAdmin: boolean;
 }
 
-export const OrdersTab = ({ isAdmin }: OrdersTabProps) => {
-  // If user is not admin, show access denied message and stop rendering further UI
-  if (!isAdmin) {
+export const OrdersTab = ({ userMode }: OrdersTabProps) => {
+  // If user is "viewer2", show access denied message and stop rendering further UI
+  if (userMode === "viewer2") {
     return (
       <div className="p-8 text-center text-muted-foreground">
         <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
@@ -78,6 +78,7 @@ export const OrdersTab = ({ isAdmin }: OrdersTabProps) => {
       </div>
     );
   }
+
 
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);

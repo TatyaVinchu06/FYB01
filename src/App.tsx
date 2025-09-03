@@ -7,7 +7,7 @@ import { OrdersTab } from './components/OrdersTab';
 import { Toaster } from './components/ui/toaster';
 import './styles/globals.css';
 
-export type UserMode = 'admin' | 'viewer';
+export type UserMode = 'admin' | 'gangmember' | 'viewer2';
 
 function App() {
   const [userMode, setUserMode] = useState<UserMode | null>(null);
@@ -24,11 +24,24 @@ function App() {
     setShowLoginModal(true);
     setActiveTab('members');
   };
-  const tabs = [
+
+  // Filter tabs based on user role - only show orders tab to admin and gangmember
+  const getAllTabs = () => [
     { id: 'members', label: 'Gang Members', icon: Users },
     { id: 'expenditures', label: 'Money Moves', icon: DollarSign },
     { id: 'orders', label: 'Arsenal Orders', icon: ShoppingCart },
   ];
+
+  const getVisibleTabs = () => {
+    const allTabs = getAllTabs();
+    if (userMode === 'admin' || userMode === 'gangmember') {
+      return allTabs; // Show all tabs including orders
+    } else {
+      return allTabs.filter(tab => tab.id !== 'orders'); // Hide orders tab for viewer2
+    }
+  };
+
+  const tabs = getVisibleTabs();
 
   const isAdmin = userMode === 'admin';
 
@@ -61,15 +74,20 @@ function App() {
             
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 px-3 py-1 bg-purple-600/20 rounded-full border border-purple-500/30">
-                {isAdmin ? (
+                {userMode === 'admin' ? (
                   <>
                     <Shield className="w-4 h-4 text-yellow-400" />
-                    <span className="text-sm font-medium text-yellow-400">Management</span>
+                    <span className="text-sm font-medium text-yellow-400">Leader</span>
+                  </>
+                ) : userMode === 'gangmember' ? (
+                  <>
+                    <Users className="w-4 h-4 text-purple-300" />
+                    <span className="text-sm font-medium text-purple-300">Gang Member</span>
                   </>
                 ) : (
                   <>
-                    <Users className="w-4 h-4 text-purple-300" />
-                    <span className="text-sm font-medium text-purple-300">Lookout</span>
+                    <Users className="w-4 h-4 text-gray-400" />
+                    <span className="text-sm font-medium text-gray-400">Guest Viewer</span>
                   </>
                 )}
               </div>
@@ -132,9 +150,9 @@ function App() {
           />
         )}
         
-        {activeTab === 'orders' && (
+        {activeTab === 'orders' && (userMode === 'admin' || userMode === 'gangmember') && (
           <OrdersTab
-            isAdmin={isAdmin}
+            userMode={userMode}
           />
         )}
       </main>

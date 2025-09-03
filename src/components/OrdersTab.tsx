@@ -103,18 +103,20 @@ export const OrdersTab = (props: OrdersTabProps) => {
 
   const mode: UserMode | null = fallback;
 
-  // Only admin can access
-  const isAllowed = mode === "admin";
+  // Allow both admin (Leader) and gangmember (Gang Member) to access orders
+  const isAllowed = mode === "admin" || mode === "gangmember";
   if (!isAllowed) {
     return (
       <div className="p-8 text-center text-muted-foreground">
         <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
         <p>You do not have permission to view this content.</p>
-        <p className="mt-2">Please contact an administrator for access.</p>
+        <p className="mt-2">Only Leaders and Gang Members can access Arsenal Orders.</p>
       </div>
     );
   }
 
+  // Check if user is admin for edit permissions
+  const isAdmin = mode === "admin";
 
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -156,6 +158,7 @@ export const OrdersTab = (props: OrdersTabProps) => {
       unsubscribeOrders();
     };
   }, [newOrder.selectedItemId]);
+
   const placeOrder = async () => {
     if (newOrder.memberName.trim() && newOrder.selectedItemId) {
       const selectedItem = availableItems.find(item => item.id === newOrder.selectedItemId);
@@ -317,7 +320,7 @@ export const OrdersTab = (props: OrdersTabProps) => {
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    {editingItem === item.id ? (
+                    {editingItem === item.id && isAdmin ? (
                       <EditItemForm 
                         item={item}
                         onSave={(updates) => updateItem(item.id, updates)}
@@ -339,7 +342,7 @@ export const OrdersTab = (props: OrdersTabProps) => {
                         ${item.price}
                       </div>
                     )}
-                    {editingItem !== item.id && (
+                    {editingItem !== item.id && isAdmin && (
                       <div className="flex gap-1">
                         <Button
                           size="sm"
@@ -366,37 +369,39 @@ export const OrdersTab = (props: OrdersTabProps) => {
           </div>
           
           {/* Add New Item (Admin Only) */}
-          <Card className="border-dashed border-2 border-border/50">
-            <CardContent className="p-4">
-              <h4 className="font-rajdhani font-bold mb-3 text-gang-glow">Add New Item</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <Input
-                  placeholder="Item name"
-                  value={newItem.name}
-                  onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                  className="bg-input"
-                />
-                <Input
-                  placeholder="Description"
-                  value={newItem.description}
-                  onChange={(e) => setNewItem({...newItem, description: e.target.value})}
-                  className="bg-input"
-                />
-                <div className="flex gap-2">
+          {isAdmin && (
+            <Card className="border-dashed border-2 border-border/50">
+              <CardContent className="p-4">
+                <h4 className="font-rajdhani font-bold mb-3 text-gang-glow">Add New Item</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <Input
-                    type="number"
-                    placeholder="Price"
-                    value={newItem.price}
-                    onChange={(e) => setNewItem({...newItem, price: e.target.value})}
-                    className="bg-input flex-1"
+                    placeholder="Item name"
+                    value={newItem.name}
+                    onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                    className="bg-input"
                   />
-                  <Button onClick={addItem} className="btn-gang">
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                  <Input
+                    placeholder="Description"
+                    value={newItem.description}
+                    onChange={(e) => setNewItem({...newItem, description: e.target.value})}
+                    className="bg-input"
+                  />
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Price"
+                      value={newItem.price}
+                      onChange={(e) => setNewItem({...newItem, price: e.target.value})}
+                      className="bg-input flex-1"
+                    />
+                    <Button onClick={addItem} className="btn-gang">
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </CardContent>
       </Card>
 
@@ -478,38 +483,40 @@ export const OrdersTab = (props: OrdersTabProps) => {
                   Total: ${order.totalAmount.toFixed(2)}
                 </div>
 
-                {/* Controls to update status */}
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  {order.status === "pending" && (
-                    <>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="btn-gang-outline"
-                        onClick={() => updateOrderStatus(order.id, "approved")}
-                      >
-                        Approve
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => updateOrderStatus(order.id, "cancelled")}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  )}
+                {/* Controls to update status (Admin Only) */}
+                {isAdmin && (
+                  <div className="mt-3 flex gap-2 flex-wrap">
+                    {order.status === "pending" && (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="btn-gang-outline"
+                          onClick={() => updateOrderStatus(order.id, "approved")}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => updateOrderStatus(order.id, "cancelled")}
+                        >
+                          Cancel
+                        </Button>
+                      </>
+                    )}
 
-                  {order.status === "approved" && (
-                    <Button
-                      size="sm"
-                      variant="success"
-                      onClick={() => updateOrderStatus(order.id, "completed")}
-                    >
-                      Complete
-                    </Button>
-                  )}
-                </div>
+                    {order.status === "approved" && (
+                      <Button
+                        size="sm"
+                        variant="success"
+                        onClick={() => updateOrderStatus(order.id, "completed")}
+                      >
+                        Complete
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             ))
           )}

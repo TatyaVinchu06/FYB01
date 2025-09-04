@@ -47,7 +47,13 @@ function App() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-purple-800 to-indigo-900">
+      <div
+  className="min-h-screen bg-cover bg-center bg-no-repeat"
+  style={{
+    backgroundImage: "url('https://media.discordapp.net/attachments/1411285098438852728/1413154504790245426/FYB.webp?ex=68bae631&is=68b994b1&hm=3204f5ab817974572f1e6379e0cdd16c301129de9bec4cb11f343631b5d61bb2&=&format=webp&width=1349&height=758')"
+  }}
+>
+
         {/* Login Modal */}
         <LoginModal 
           isOpen={showLoginModal} 

@@ -68,9 +68,12 @@ function App() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-purple-700 rounded-lg flex items-center justify-center">
-                  <Crown className="w-6 h-6 text-yellow-400" />
-                </div>
+<img
+  src="https://media.discordapp.net/attachments/1411285098438852728/1413154504353906809/9AAE2F5A-8ACB-47B8-B481-6FC722588F40.webp?ex=68bae630&is=68b994b0&hm=52e3794431f6c522d2d4431ad9faa9164d6b3447333019a4d5a0042d41777001&=&format=webp&width=758&height=758"
+  alt="FYB Logo"
+  className="w-10 h-10 rounded-lg object-cover"
+/>
+
                 <div>
                   <h1 className="text-xl font-bold text-white">FYB Gang System</h1>
                   <p className="text-xs text-purple-300">Loyalty meets street</p>

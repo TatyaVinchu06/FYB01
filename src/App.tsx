@@ -70,7 +70,7 @@ function App() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
 <img
-  src="https://media.discordapp.net/attachments/1411285098438852728/1413154504353906809/9AAE2F5A-8ACB-47B8-B481-6FC722588F40.webp?ex=68bae630&is=68b994b0&hm=52e3794431f6c522d2d4431ad9faa9164d6b3447333019a4d5a0042d41777001&=&format=webp&width=758&height=758"
+  src="https://media.discordapp.net/attachments/1289640589200986285/1413157404647886858/LOGO.png?ex=68bae8e4&is=68b99764&hm=7f3a12256a349cdf1e1f8973b0ce24a5a3269b01834c50a5b79ab77a4eee1828&=&format=webp&quality=lossless&width=478&height=583"
   alt="FYB Logo"
   className="w-10 h-10 rounded-lg object-cover"
 />

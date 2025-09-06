@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Users, DollarSign, ShoppingCart, Crown, Shield, Lock } from 'lucide-react';
+import { Users, DollarSign, ShoppingCart, Crown, Shield, Lock, FileText } from 'lucide-react';
 import { LoginModal } from './components/LoginScreen';
 import { MembersTab } from './components/MembersTab';
 import { ExpendituresTab } from './components/ExpendituresTab';
 import { OrdersTab } from './components/OrdersTab';
+import { AuditLogsTab } from './components/AuditLogsTab';
 import { Toaster } from './components/ui/toaster';
 import './styles/globals.css';
 
@@ -30,6 +31,7 @@ function App() {
     { id: 'members', label: 'Gang Members', icon: Users },
     { id: 'expenditures', label: 'Money Moves', icon: DollarSign },
     { id: 'orders', label: 'Arsenal Orders', icon: ShoppingCart },
+    { id: 'audit-logs', label: 'Audit Logs', icon: FileText },
   ];
 
   const getVisibleTabs = () => {
@@ -163,6 +165,12 @@ function App() {
         {activeTab === 'orders' && (userMode === 'admin' || userMode === 'gangmember') && (
           <OrdersTab
             userMode={userMode}
+          />
+        )}
+        
+        {activeTab === 'audit-logs' && (
+          <AuditLogsTab
+            isAdmin={isAdmin}
           />
         )}
       </main>

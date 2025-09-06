@@ -94,6 +94,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         );
         
         if (paymentRecord) {
+          console.log('📋 Using payment record:', { memberId: member.id, weekNumber, paymentRecord: paymentRecord.hasPaid });
           return {
             memberId: member.id,
             memberName: member.name,
@@ -104,6 +105,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         }
         
         // Fallback to current payment status if no record exists
+        console.log('📋 Using member fallback:', { memberId: member.id, weekNumber, memberHasPaid: member.hasPaid });
         return {
           memberId: member.id,
           memberName: member.name,
@@ -155,6 +157,8 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const getStatusBadge = (hasPaid: boolean, memberId: string, weekNumber: number) => {
     const paymentKey = `${memberId}-${weekNumber}`;
     const isProcessing = markingPayment === paymentKey;
+    
+    console.log('🎯 getStatusBadge called:', { hasPaid, memberId, weekNumber, isProcessing, paymentKey });
 
     if (!isAdmin) {
       // For non-admin users, just show the status
@@ -176,7 +180,10 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       <div className="flex gap-1">
         <Badge 
           className={`${hasPaid ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground hover:bg-success/80'} ${isProcessing ? 'opacity-50' : 'cursor-pointer'} transition-colors`}
-          onClick={!hasPaid && !isProcessing ? () => markPaymentAsPaid(memberId, weekNumber) : undefined}
+          onClick={!hasPaid && !isProcessing ? () => {
+            console.log('🖱️ Paid button clicked!', { memberId, weekNumber, hasPaid, isProcessing });
+            markPaymentAsPaid(memberId, weekNumber);
+          } : undefined}
           title={!hasPaid ? (isProcessing ? "Processing..." : "Click to mark as paid") : "Already paid"}
         >
           {isProcessing && !hasPaid ? (
@@ -189,7 +196,10 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         
         <Badge 
           className={`${!hasPaid ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground hover:bg-destructive/80'} ${isProcessing ? 'opacity-50' : 'cursor-pointer'} transition-colors`}
-          onClick={hasPaid && !isProcessing ? () => markPaymentAsPending(memberId, weekNumber) : undefined}
+          onClick={hasPaid && !isProcessing ? () => {
+            console.log('🖱️ Pending button clicked!', { memberId, weekNumber, hasPaid, isProcessing });
+            markPaymentAsPending(memberId, weekNumber);
+          } : undefined}
           title={hasPaid ? (isProcessing ? "Processing..." : "Click to mark as pending") : "Already pending"}
         >
           {isProcessing && hasPaid ? (

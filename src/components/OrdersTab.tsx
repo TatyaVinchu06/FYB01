@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ShoppingCart, Package, Clock, CheckCircle, AlertTriangle, Plus, Edit, Trash2, Save } from "lucide-react";
-import { firestoreService, Transaction } from "@/lib/firestore";
+import { firestoreService, Transaction, Item, Order } from "@/lib/firestore";
 
 // EditItemForm component to handle item editing safely
 interface EditItemFormProps {
@@ -257,7 +257,9 @@ export const OrdersTab = (props: OrdersTabProps) => {
   }
 
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
-  const totalValue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+  const totalValue = orders
+    .filter(o => o.status !== 'cancelled') // Exclude cancelled orders from total
+    .reduce((sum, order) => sum + order.totalAmount, 0);
 
   return (
     <div className="space-y-6">
@@ -525,5 +527,6 @@ export const OrdersTab = (props: OrdersTabProps) => {
     </div>
   );
 };
+
 
 

@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { FileText, Calendar, CheckCircle, XCircle, Clock, DollarSign, Edit, Save, X } from "lucide-react";
+import { FileText, Calendar, CheckCircle, XCircle, Clock, DollarSign } from "lucide-react";
 import { firestoreService, Member, Order, WeeklyPaymentRecord } from "@/lib/firestore";
 
 interface AuditLogsTabProps {
@@ -32,8 +30,6 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const [weeklyPaymentRecords, setWeeklyPaymentRecords] = useState<WeeklyPaymentRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<WeeklyAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingPayment, setEditingPayment] = useState<{ memberId: string; weekNumber: number } | null>(null);
-  const [paymentNotes, setPaymentNotes] = useState("");
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -141,14 +137,19 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     );
   };
 
-  const getStatusBadge = (hasPaid: boolean) => {
+  const getStatusBadge = (hasPaid: boolean, memberId: string, weekNumber: number) => {
     return hasPaid ? (
-      <Badge className="bg-success hover:bg-success/80">
+      <Badge className="bg-success text-success-foreground">
         <CheckCircle className="w-3 h-3 mr-1" />
         Paid
       </Badge>
     ) : (
-      <Badge variant="destructive">
+      <Badge 
+        variant="destructive"
+        className={`${isAdmin ? 'cursor-pointer hover:bg-destructive/80 transition-colors' : ''}`}
+        onClick={isAdmin ? () => markPaymentAsPaid(memberId, weekNumber) : undefined}
+        title={isAdmin ? "Click to mark as paid" : undefined}
+      >
         <XCircle className="w-3 h-3 mr-1" />
         Pending
       </Badge>
@@ -163,7 +164,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     });
   };
 
-  const markPayment = async (memberId: string, weekNumber: number, hasPaid: boolean, notes?: string) => {
+  const markPaymentAsPaid = async (memberId: string, weekNumber: number) => {
     const member = members.find(m => m.id === memberId);
     if (!member) return;
 
@@ -183,11 +184,10 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     if (existingRecord) {
       // Update existing record
       await firestoreService.updateWeeklyPaymentRecord(existingRecord.id, {
-        hasPaid,
-        paymentDate: hasPaid ? new Date().toISOString().split('T')[0] : undefined,
+        hasPaid: true,
+        paymentDate: new Date().toISOString().split('T')[0],
         markedBy: 'admin',
-        markedAt: new Date().toISOString(),
-        notes: notes || existingRecord.notes
+        markedAt: new Date().toISOString()
       });
     } else {
       // Create new record
@@ -198,26 +198,12 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         weekEnd: weekEnd.toISOString().split('T')[0],
         weekNumber,
         contribution: member.contribution,
-        hasPaid,
-        paymentDate: hasPaid ? new Date().toISOString().split('T')[0] : undefined,
+        hasPaid: true,
+        paymentDate: new Date().toISOString().split('T')[0],
         markedBy: 'admin',
-        markedAt: new Date().toISOString(),
-        notes
+        markedAt: new Date().toISOString()
       });
     }
-
-    setEditingPayment(null);
-    setPaymentNotes("");
-  };
-
-  const startEditingPayment = (memberId: string, weekNumber: number) => {
-    setEditingPayment({ memberId, weekNumber });
-    setPaymentNotes("");
-  };
-
-  const cancelEditingPayment = () => {
-    setEditingPayment(null);
-    setPaymentNotes("");
   };
 
   if (loading) {
@@ -344,54 +330,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
                           Expected
                         </div>
                       </div>
-                      {getStatusBadge(member.hasPaid)}
-                      
-                      {/* Admin Controls for Manual Payment Marking */}
-                      {isAdmin && (
-                        <div className="flex gap-2">
-                          {editingPayment?.memberId === member.memberId && editingPayment?.weekNumber === log.weekNumber ? (
-                            <div className="flex gap-2 items-center">
-                              <Input
-                                placeholder="Notes (optional)"
-                                value={paymentNotes}
-                                onChange={(e) => setPaymentNotes(e.target.value)}
-                                className="w-32 h-8 text-xs bg-input"
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() => markPayment(member.memberId, log.weekNumber, true, paymentNotes)}
-                                className="h-8 px-2 bg-success hover:bg-success/80"
-                              >
-                                <Save className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => markPayment(member.memberId, log.weekNumber, false, paymentNotes)}
-                                className="h-8 px-2 bg-destructive hover:bg-destructive/80"
-                              >
-                                <X className="w-3 h-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={cancelEditingPayment}
-                                variant="outline"
-                                className="h-8 px-2"
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          ) : (
-                            <Button
-                              size="sm"
-                              onClick={() => startEditingPayment(member.memberId, log.weekNumber)}
-                              className="h-8 px-2 btn-gang-outline"
-                              title="Mark payment manually"
-                            >
-                              <Edit className="w-3 h-3" />
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                      {getStatusBadge(member.hasPaid, member.memberId, log.weekNumber)}
                     </div>
                   </div>
                 ))}
@@ -438,13 +377,12 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
             
             {isAdmin && (
               <div className="border-t border-border pt-4">
-                <h4 className="font-rajdhani font-bold text-gang-glow mb-2">Admin Controls:</h4>
+                <h4 className="font-rajdhani font-bold text-gang-glow mb-2">Leader Controls:</h4>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p>• <strong>Edit Button</strong> - Click to manually mark/unmark payments for specific weeks</p>
-                  <p>• <strong>Notes Field</strong> - Add optional notes about the payment (e.g., "Paid 3 weeks at once")</p>
-                  <p>• <strong>Green Check</strong> - Mark as paid for this week</p>
-                  <p>• <strong>Red X</strong> - Mark as unpaid for this week</p>
-                  <p>• <strong>Use Case</strong> - Perfect for members who pay multiple weeks at once or make delayed payments</p>
+                  <p>• <strong>Click "Pending" Badge</strong> - Click any red "Pending" badge to mark as paid</p>
+                  <p>• <strong>One-Click Marking</strong> - Simple click to mark payment for that specific week</p>
+                  <p>• <strong>Perfect for</strong> - Members who pay multiple weeks at once or make delayed payments</p>
+                  <p>• <strong>Real-time Updates</strong> - Changes sync immediately across all users</p>
                 </div>
               </div>
             )}

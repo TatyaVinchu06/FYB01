@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { FileText, Calendar, CheckCircle, XCircle, Clock, DollarSign } from "lucide-react";
 import { firestoreService, Member, Order, WeeklyPaymentRecord } from "@/lib/firestore";
 
@@ -31,6 +32,8 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const [auditLogs, setAuditLogs] = useState<WeeklyAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [markingPayment, setMarkingPayment] = useState<string | null>(null);
+  const [weeksToShow, setWeeksToShow] = useState(12); // Start with 3 months
+  const [loadingMore, setLoadingMore] = useState(false);
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -53,20 +56,20 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     };
   }, []);
 
-  // Generate audit logs for the last 4 weeks
+  // Generate audit logs for the specified number of weeks
   useEffect(() => {
     if (members.length > 0) {
       generateAuditLogs();
       setLoading(false);
     }
-  }, [members, orders, weeklyPaymentRecords]);
+  }, [members, orders, weeklyPaymentRecords, weeksToShow]);
 
   const generateAuditLogs = () => {
     const logs: WeeklyAuditLog[] = [];
     const today = new Date();
     
-    // Generate logs for the last 4 weeks
-    for (let i = 0; i < 4; i++) {
+    // Generate logs for the specified number of weeks
+    for (let i = 0; i < weeksToShow; i++) {
       const weekStart = new Date(today);
       weekStart.setDate(today.getDate() - (today.getDay() + 7 * i)); // Start of week (Sunday)
       weekStart.setHours(0, 0, 0, 0);
@@ -75,7 +78,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       weekEnd.setDate(weekStart.getDate() + 6); // End of week (Saturday)
       weekEnd.setHours(23, 59, 59, 999);
       
-      const weekNumber = 4 - i;
+      const weekNumber = i + 1;
       
       // Get members who were active during this week
       const activeMembers = members.filter(member => {
@@ -116,18 +119,29 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         .reduce((sum, member) => sum + member.contribution, 0);
       const collectionRate = totalExpected > 0 ? (totalCollected / totalExpected) * 100 : 0;
 
-      logs.push({
-        weekStart: weekStart.toISOString().split('T')[0],
-        weekEnd: weekEnd.toISOString().split('T')[0],
-        weekNumber,
-        members: memberLogs,
-        totalExpected,
-        totalCollected,
-        collectionRate
-      });
+      // Only add week if there were active members or payment records
+      if (activeMembers.length > 0 || weeklyPaymentRecords.some(record => record.weekNumber === weekNumber)) {
+        logs.push({
+          weekStart: weekStart.toISOString().split('T')[0],
+          weekEnd: weekEnd.toISOString().split('T')[0],
+          weekNumber,
+          members: memberLogs,
+          totalExpected,
+          totalCollected,
+          collectionRate
+        });
+      }
     }
 
     setAuditLogs(logs);
+  };
+
+  const loadMoreWeeks = () => {
+    setLoadingMore(true);
+    setTimeout(() => {
+      setWeeksToShow(prev => prev + 12); // Load 3 more months
+      setLoadingMore(false);
+    }, 500);
   };
 
   const getStatusIcon = (hasPaid: boolean) => {
@@ -347,7 +361,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
           Audit Logs
         </h1>
         <p className="text-muted-foreground">
-          Weekly payment tracking for the last 4 weeks
+          Weekly payment tracking - Showing {auditLogs.length} weeks of history
         </p>
       </div>
 
@@ -466,6 +480,27 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* Load More Button */}
+      <div className="flex justify-center">
+        <Button
+          onClick={loadMoreWeeks}
+          disabled={loadingMore}
+          className="btn-gang-outline"
+        >
+          {loadingMore ? (
+            <>
+              <div className="w-4 h-4 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Loading More...
+            </>
+          ) : (
+            <>
+              <Calendar className="w-4 h-4 mr-2" />
+              Load More Weeks (3 months)
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Legend */}

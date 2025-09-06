@@ -11,7 +11,8 @@ import {
   orderBy,
   getDocs,
   setDoc,
-  getDoc
+  getDoc,
+  writeBatch
 } from 'firebase/firestore';
 
 // Firebase configuration
@@ -41,6 +42,7 @@ export interface Member {
   contribution: number;
   hasPaid: boolean;
   joinDate: string;
+  order: number; // For drag-and-drop reordering
 }
 
 export interface Transaction {
@@ -99,7 +101,7 @@ export interface AuditLog {
 export const firestoreService = {
   // Members
   subscribeToMembers: (callback: (members: Member[]) => void) => {
-    const q = query(collection(db, 'members'), orderBy('joinDate', 'desc'));
+    const q = query(collection(db, 'members'), orderBy('order', 'asc'));
     return onSnapshot(q, (snapshot) => {
       const members = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -115,6 +117,15 @@ export const firestoreService = {
 
   updateMember: async (id: string, updates: Partial<Member>) => {
     return await updateDoc(doc(db, 'members', id), updates);
+  },
+
+  batchUpdateMembers: async (updates: { id: string; updates: Partial<Member> }[]) => {
+    const batch = writeBatch(db);
+    updates.forEach(({ id, updates: memberUpdates }) => {
+      const memberRef = doc(db, 'members', id);
+      batch.update(memberRef, memberUpdates);
+    });
+    return await batch.commit();
   },
 
   deleteMember: async (id: string) => {

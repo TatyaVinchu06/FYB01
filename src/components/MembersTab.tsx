@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, UserCheck, UserX, DollarSign, Trash2, Save, Edit, Settings } from "lucide-react";
-import { firestoreService, Transaction } from "@/lib/firestore";
+import { firestoreService, Transaction, Member, GangFund, Order } from "@/lib/firestore";
 
 
 
@@ -14,6 +14,7 @@ interface MembersTabProps {
 
 export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const [members, setMembers] = useState<Member[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [newMemberName, setNewMemberName] = useState("");
   const [gangFund, setGangFund] = useState<GangFund | null>(null);
@@ -34,7 +35,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
 
   // Subscribe to real-time updates
   useEffect(() => {
-    const unsubscribe = firestoreService.subscribeToMembers((newMembers) => {
+    const unsubscribeMembers = firestoreService.subscribeToMembers((newMembers) => {
       console.log('📥 Received members data:', newMembers);
       
       // Validate that we have an array
@@ -66,7 +67,14 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    const unsubscribeOrders = firestoreService.subscribeToOrders((newOrders) => {
+      setOrders(newOrders);
+    });
+
+    return () => {
+      unsubscribeMembers();
+      unsubscribeOrders();
+    };
   }, []);
 
   // Subscribe to gang fund updates
@@ -198,7 +206,13 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const paidMembers = members.filter(m => m.hasPaid);
   const totalContributions = paidMembers.reduce((sum, member) => sum + member.contribution, 0);
   const baseAmount = gangFund?.baseAmount || 20000;
-  const totalFunds = baseAmount + totalContributions;
+  
+  // Add approved orders to collected funds
+  const approvedOrdersTotal = orders
+    .filter(order => order.status === 'approved' || order.status === 'completed')
+    .reduce((sum, order) => sum + order.totalAmount, 0);
+  
+  const totalFunds = baseAmount + totalContributions + approvedOrdersTotal;
 
   if (loading) {
     return (

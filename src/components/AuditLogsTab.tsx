@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Calendar, CheckCircle, XCircle, Clock, DollarSign } from "lucide-react";
-import { firestoreService, Member, Order } from "@/lib/firestore";
+import { Input } from "@/components/ui/input";
+import { FileText, Calendar, CheckCircle, XCircle, Clock, DollarSign, Edit, Save, X } from "lucide-react";
+import { firestoreService, Member, Order, WeeklyPaymentRecord } from "@/lib/firestore";
 
 interface AuditLogsTabProps {
   isAdmin: boolean;
@@ -28,8 +29,11 @@ interface WeeklyAuditLog {
 export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [weeklyPaymentRecords, setWeeklyPaymentRecords] = useState<WeeklyPaymentRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<WeeklyAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingPayment, setEditingPayment] = useState<{ memberId: string; weekNumber: number } | null>(null);
+  const [paymentNotes, setPaymentNotes] = useState("");
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -41,9 +45,14 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       setOrders(newOrders);
     });
 
+    const unsubscribePaymentRecords = firestoreService.subscribeToWeeklyPaymentRecords((newRecords) => {
+      setWeeklyPaymentRecords(newRecords);
+    });
+
     return () => {
       unsubscribeMembers();
       unsubscribeOrders();
+      unsubscribePaymentRecords();
     };
   }, []);
 
@@ -53,7 +62,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       generateAuditLogs();
       setLoading(false);
     }
-  }, [members, orders]);
+  }, [members, orders, weeklyPaymentRecords]);
 
   const generateAuditLogs = () => {
     const logs: WeeklyAuditLog[] = [];
@@ -77,10 +86,24 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         return joinDate <= weekEnd;
       });
 
-      // Calculate payment status for this week
+      // Calculate payment status for this week using weekly payment records
       const memberLogs = activeMembers.map(member => {
-        // For now, we'll use current payment status
-        // In a real implementation, you'd track historical payment data
+        // Check if there's a payment record for this member and week
+        const paymentRecord = weeklyPaymentRecords.find(record => 
+          record.memberId === member.id && record.weekNumber === weekNumber
+        );
+        
+        if (paymentRecord) {
+          return {
+            memberId: member.id,
+            memberName: member.name,
+            hasPaid: paymentRecord.hasPaid,
+            contribution: paymentRecord.contribution,
+            paymentDate: paymentRecord.paymentDate
+          };
+        }
+        
+        // Fallback to current payment status if no record exists
         return {
           memberId: member.id,
           memberName: member.name,
@@ -138,6 +161,63 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       day: 'numeric',
       year: 'numeric'
     });
+  };
+
+  const markPayment = async (memberId: string, weekNumber: number, hasPaid: boolean, notes?: string) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) return;
+
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (4 - weekNumber)));
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    // Check if record already exists
+    const existingRecord = weeklyPaymentRecords.find(record => 
+      record.memberId === memberId && record.weekNumber === weekNumber
+    );
+
+    if (existingRecord) {
+      // Update existing record
+      await firestoreService.updateWeeklyPaymentRecord(existingRecord.id, {
+        hasPaid,
+        paymentDate: hasPaid ? new Date().toISOString().split('T')[0] : undefined,
+        markedBy: 'admin',
+        markedAt: new Date().toISOString(),
+        notes: notes || existingRecord.notes
+      });
+    } else {
+      // Create new record
+      await firestoreService.addWeeklyPaymentRecord({
+        memberId,
+        memberName: member.name,
+        weekStart: weekStart.toISOString().split('T')[0],
+        weekEnd: weekEnd.toISOString().split('T')[0],
+        weekNumber,
+        contribution: member.contribution,
+        hasPaid,
+        paymentDate: hasPaid ? new Date().toISOString().split('T')[0] : undefined,
+        markedBy: 'admin',
+        markedAt: new Date().toISOString(),
+        notes
+      });
+    }
+
+    setEditingPayment(null);
+    setPaymentNotes("");
+  };
+
+  const startEditingPayment = (memberId: string, weekNumber: number) => {
+    setEditingPayment({ memberId, weekNumber });
+    setPaymentNotes("");
+  };
+
+  const cancelEditingPayment = () => {
+    setEditingPayment(null);
+    setPaymentNotes("");
   };
 
   if (loading) {
@@ -265,6 +345,53 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
                         </div>
                       </div>
                       {getStatusBadge(member.hasPaid)}
+                      
+                      {/* Admin Controls for Manual Payment Marking */}
+                      {isAdmin && (
+                        <div className="flex gap-2">
+                          {editingPayment?.memberId === member.memberId && editingPayment?.weekNumber === log.weekNumber ? (
+                            <div className="flex gap-2 items-center">
+                              <Input
+                                placeholder="Notes (optional)"
+                                value={paymentNotes}
+                                onChange={(e) => setPaymentNotes(e.target.value)}
+                                className="w-32 h-8 text-xs bg-input"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => markPayment(member.memberId, log.weekNumber, true, paymentNotes)}
+                                className="h-8 px-2 bg-success hover:bg-success/80"
+                              >
+                                <Save className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => markPayment(member.memberId, log.weekNumber, false, paymentNotes)}
+                                className="h-8 px-2 bg-destructive hover:bg-destructive/80"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={cancelEditingPayment}
+                                variant="outline"
+                                className="h-8 px-2"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => startEditingPayment(member.memberId, log.weekNumber)}
+                              className="h-8 px-2 btn-gang-outline"
+                              title="Mark payment manually"
+                            >
+                              <Edit className="w-3 h-3" />
+                            </Button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -285,27 +412,42 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       <Card className="card-gang">
         <CardHeader>
           <CardTitle className="font-orbitron text-gang-glow text-sm">
-            Legend
+            Legend & Manual Payment Controls
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-success" />
-              <span>Paid - Member has contributed this week</span>
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-success" />
+                <span>Paid - Member has contributed this week</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-destructive" />
+                <span>Pending - Member has not contributed this week</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-success">80%+</Badge>
+                <span>Good collection rate</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant="destructive">&lt;80%</Badge>
+                <span>Needs attention</span>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <XCircle className="w-4 h-4 text-destructive" />
-              <span>Pending - Member has not contributed this week</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge className="bg-success">80%+</Badge>
-              <span>Good collection rate</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="destructive">&lt;80%</Badge>
-              <span>Needs attention</span>
-            </div>
+            
+            {isAdmin && (
+              <div className="border-t border-border pt-4">
+                <h4 className="font-rajdhani font-bold text-gang-glow mb-2">Admin Controls:</h4>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p>• <strong>Edit Button</strong> - Click to manually mark/unmark payments for specific weeks</p>
+                  <p>• <strong>Notes Field</strong> - Add optional notes about the payment (e.g., "Paid 3 weeks at once")</p>
+                  <p>• <strong>Green Check</strong> - Mark as paid for this week</p>
+                  <p>• <strong>Red X</strong> - Mark as unpaid for this week</p>
+                  <p>• <strong>Use Case</strong> - Perfect for members who pay multiple weeks at once or make delayed payments</p>
+                </div>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

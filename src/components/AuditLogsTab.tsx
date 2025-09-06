@@ -221,10 +221,11 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     const paymentKey = `${memberId}-${weekNumber}`;
     setMarkingPayment(paymentKey);
 
-    console.log('Marking payment as paid for member:', member.name, 'week:', weekNumber);
+    console.log('✅ Marking payment as PAID for member:', member.name, 'week:', weekNumber);
+    console.log('📊 Current member hasPaid status:', member.hasPaid);
 
     const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (4 - weekNumber)));
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (weekNumber - 1)));
     weekStart.setHours(0, 0, 0, 0);
     
     const weekEnd = new Date(weekStart);
@@ -268,7 +269,8 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         hasPaid: true
       });
 
-      console.log('Payment marked as paid successfully!');
+      console.log('✅ Payment marked as PAID successfully!');
+      console.log('📊 Updated member hasPaid to:', true);
     } catch (error) {
       console.error('Error marking payment as paid:', error);
     } finally {
@@ -286,10 +288,11 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     const paymentKey = `${memberId}-${weekNumber}`;
     setMarkingPayment(paymentKey);
 
-    console.log('Marking payment as pending for member:', member.name, 'week:', weekNumber);
+    console.log('🔄 Marking payment as PENDING for member:', member.name, 'week:', weekNumber);
+    console.log('📊 Current member hasPaid status:', member.hasPaid);
 
     const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (4 - weekNumber)));
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (weekNumber - 1)));
     weekStart.setHours(0, 0, 0, 0);
     
     const weekEnd = new Date(weekStart);
@@ -333,7 +336,8 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         hasPaid: false
       });
 
-      console.log('Payment marked as pending successfully!');
+      console.log('🔄 Payment marked as PENDING successfully!');
+      console.log('📊 Updated member hasPaid to:', false);
     } catch (error) {
       console.error('Error marking payment as pending:', error);
     } finally {
@@ -550,3 +554,4 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     </div>
   );
 };
+

@@ -180,6 +180,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const [editingContribution, setEditingContribution] = useState<{ [key: string]: string }>({});
   const [creatingTestData, setCreatingTestData] = useState(false);
   const [draggedMemberId, setDraggedMemberId] = useState<string | null>(null);
+  const [lastResetDate, setLastResetDate] = useState<string | null>(null);
 
   const safeFormatDate = (value: string) => {
     try {
@@ -188,6 +189,44 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
       return d.toLocaleDateString();
     } catch {
       return value || 'Unknown';
+    }
+  };
+
+  const checkAndResetWeeklyPayments = async () => {
+    const today = new Date();
+    const todayString = today.toISOString().split('T')[0];
+    
+    // Check if today is Sunday (day 0)
+    const isSunday = today.getDay() === 0;
+    
+    // Check if we've already reset this week
+    const lastReset = localStorage.getItem('lastWeeklyReset');
+    
+    if (isSunday && lastReset !== todayString) {
+      console.log('🔄 It\'s Sunday! Resetting all member payments...');
+      
+      try {
+        // Get all members who have paid
+        const paidMembers = members.filter(member => member.hasPaid);
+        
+        if (paidMembers.length > 0) {
+          // Batch update all paid members to unpaid
+          const updates = paidMembers.map(member => ({
+            id: member.id,
+            updates: { hasPaid: false }
+          }));
+          
+          await firestoreService.batchUpdateMembers(updates);
+          
+          // Update localStorage to track last reset
+          localStorage.setItem('lastWeeklyReset', todayString);
+          setLastResetDate(todayString);
+          
+          console.log(`✅ Reset ${paidMembers.length} members' payment status for the new week`);
+        }
+      } catch (error) {
+        console.error('❌ Error resetting weekly payments:', error);
+      }
     }
   };
 
@@ -246,6 +285,13 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
 
     return () => unsubscribe();
   }, [editFundAmount]);
+
+  // Check for weekly reset on component mount and when members change
+  useEffect(() => {
+    if (members.length > 0) {
+      checkAndResetWeeklyPayments();
+    }
+  }, [members]);
 
   const addMember = async () => {
     if (newMemberName.trim()) {
@@ -435,7 +481,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="card-gang">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-rajdhani text-muted-foreground">Total Members</CardTitle>
@@ -468,6 +514,20 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
           <CardContent>
             <div className="text-2xl font-orbitron font-bold text-gang-neon">
               ${totalFunds.toLocaleString()}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="card-gang">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-rajdhani text-muted-foreground">Weekly Reset</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm font-orbitron font-bold text-gang-glow">
+              {lastResetDate ? `Last: ${safeFormatDate(lastResetDate)}` : 'Auto-reset on Sundays'}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {new Date().getDay() === 0 ? '🔄 Reset Day!' : 'Next: Sunday'}
             </div>
           </CardContent>
         </Card>
@@ -632,11 +692,6 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
             )}
           </div>
         </CardContent>
-      </Card>
-    </div>
-  );
-};
-
       </Card>
     </div>
   );

@@ -30,6 +30,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const [weeklyPaymentRecords, setWeeklyPaymentRecords] = useState<WeeklyPaymentRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<WeeklyAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [markingPayment, setMarkingPayment] = useState<string | null>(null);
 
   // Subscribe to real-time updates
   useEffect(() => {
@@ -138,6 +139,9 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   };
 
   const getStatusBadge = (hasPaid: boolean, memberId: string, weekNumber: number) => {
+    const paymentKey = `${memberId}-${weekNumber}`;
+    const isProcessing = markingPayment === paymentKey;
+
     return hasPaid ? (
       <Badge className="bg-success text-success-foreground">
         <CheckCircle className="w-3 h-3 mr-1" />
@@ -146,12 +150,16 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     ) : (
       <Badge 
         variant="destructive"
-        className={`${isAdmin ? 'cursor-pointer hover:bg-destructive/80 transition-colors' : ''}`}
-        onClick={isAdmin ? () => markPaymentAsPaid(memberId, weekNumber) : undefined}
-        title={isAdmin ? "Click to mark as paid" : undefined}
+        className={`${isAdmin && !isProcessing ? 'cursor-pointer hover:bg-destructive/80 transition-colors' : ''} ${isProcessing ? 'opacity-50' : ''}`}
+        onClick={isAdmin && !isProcessing ? () => markPaymentAsPaid(memberId, weekNumber) : undefined}
+        title={isAdmin ? (isProcessing ? "Processing..." : "Click to mark as paid") : undefined}
       >
-        <XCircle className="w-3 h-3 mr-1" />
-        Pending
+        {isProcessing ? (
+          <div className="w-3 h-3 mr-1 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        ) : (
+          <XCircle className="w-3 h-3 mr-1" />
+        )}
+        {isProcessing ? "Processing..." : "Pending"}
       </Badge>
     );
   };
@@ -166,7 +174,15 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
 
   const markPaymentAsPaid = async (memberId: string, weekNumber: number) => {
     const member = members.find(m => m.id === memberId);
-    if (!member) return;
+    if (!member) {
+      console.error('Member not found:', memberId);
+      return;
+    }
+
+    const paymentKey = `${memberId}-${weekNumber}`;
+    setMarkingPayment(paymentKey);
+
+    console.log('Marking payment as paid for member:', member.name, 'week:', weekNumber);
 
     const weekStart = new Date();
     weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (4 - weekNumber)));
@@ -176,33 +192,48 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     weekEnd.setDate(weekStart.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
 
-    // Check if record already exists
-    const existingRecord = weeklyPaymentRecords.find(record => 
-      record.memberId === memberId && record.weekNumber === weekNumber
-    );
+    try {
+      // Check if record already exists
+      const existingRecord = weeklyPaymentRecords.find(record => 
+        record.memberId === memberId && record.weekNumber === weekNumber
+      );
 
-    if (existingRecord) {
-      // Update existing record
-      await firestoreService.updateWeeklyPaymentRecord(existingRecord.id, {
-        hasPaid: true,
-        paymentDate: new Date().toISOString().split('T')[0],
-        markedBy: 'admin',
-        markedAt: new Date().toISOString()
+      if (existingRecord) {
+        // Update existing record
+        await firestoreService.updateWeeklyPaymentRecord(existingRecord.id, {
+          hasPaid: true,
+          paymentDate: new Date().toISOString().split('T')[0],
+          markedBy: 'admin',
+          markedAt: new Date().toISOString()
+        });
+        console.log('Updated existing payment record');
+      } else {
+        // Create new record
+        await firestoreService.addWeeklyPaymentRecord({
+          memberId,
+          memberName: member.name,
+          weekStart: weekStart.toISOString().split('T')[0],
+          weekEnd: weekEnd.toISOString().split('T')[0],
+          weekNumber,
+          contribution: member.contribution,
+          hasPaid: true,
+          paymentDate: new Date().toISOString().split('T')[0],
+          markedBy: 'admin',
+          markedAt: new Date().toISOString()
+        });
+        console.log('Created new payment record');
+      }
+
+      // Update member's payment status in the main members collection
+      await firestoreService.updateMember(memberId, {
+        hasPaid: true
       });
-    } else {
-      // Create new record
-      await firestoreService.addWeeklyPaymentRecord({
-        memberId,
-        memberName: member.name,
-        weekStart: weekStart.toISOString().split('T')[0],
-        weekEnd: weekEnd.toISOString().split('T')[0],
-        weekNumber,
-        contribution: member.contribution,
-        hasPaid: true,
-        paymentDate: new Date().toISOString().split('T')[0],
-        markedBy: 'admin',
-        markedAt: new Date().toISOString()
-      });
+
+      console.log('Payment marked as paid successfully!');
+    } catch (error) {
+      console.error('Error marking payment as paid:', error);
+    } finally {
+      setMarkingPayment(null);
     }
   };
 

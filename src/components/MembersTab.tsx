@@ -172,6 +172,7 @@ const SortableMemberItem = ({
 export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [newMemberName, setNewMemberName] = useState("");
   const [gangFund, setGangFund] = useState<GangFund | null>(null);
@@ -268,9 +269,14 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
       setOrders(newOrders);
     });
 
+    const unsubscribeTransactions = firestoreService.subscribeToTransactions((newTransactions) => {
+      setTransactions(newTransactions);
+    });
+
     return () => {
       unsubscribeMembers();
       unsubscribeOrders();
+      unsubscribeTransactions();
     };
   }, []);
 
@@ -465,7 +471,13 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
     .filter(order => order.status === 'approved' || order.status === 'completed')
     .reduce((sum, order) => sum + order.totalAmount, 0);
   
-  const totalFunds = baseAmount + totalContributions + approvedOrdersTotal;
+  // Calculate net balance from transactions (Money Moves)
+  const totalSpent = transactions.filter(t => t.type === 'expense').reduce((sum, exp) => sum + exp.amount, 0);
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, inc) => sum + inc.amount, 0);
+  const netTransactionBalance = totalIncome - totalSpent;
+  
+  // Calculate comprehensive total funds
+  const totalFunds = baseAmount + totalContributions + approvedOrdersTotal + netTransactionBalance;
 
   if (loading) {
     return (
@@ -508,12 +520,15 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-rajdhani text-muted-foreground">
               <DollarSign className="w-4 h-4 inline mr-1" />
-              Collected Funds
+              Total Gang Funds
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-orbitron font-bold text-gang-neon">
               ${totalFunds.toLocaleString()}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Base: ${baseAmount.toLocaleString()} + Members: ${totalContributions.toLocaleString()} + Orders: ${approvedOrdersTotal.toLocaleString()} + Net: ${netTransactionBalance.toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -532,6 +547,72 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Comprehensive Financial Overview */}
+      <Card className="card-gang">
+        <CardHeader>
+          <CardTitle className="font-orbitron text-gang-glow flex items-center">
+            <DollarSign className="w-5 h-5 mr-2" />
+            💰 Comprehensive Financial Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Income Sources */}
+            <div className="space-y-3">
+              <h4 className="font-rajdhani font-bold text-success text-lg">💰 Income Sources</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
+                  <span className="text-sm">Base Gang Fund</span>
+                  <span className="font-orbitron font-bold text-success">${baseAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
+                  <span className="text-sm">Member Contributions</span>
+                  <span className="font-orbitron font-bold text-success">${totalContributions.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
+                  <span className="text-sm">Approved Orders</span>
+                  <span className="font-orbitron font-bold text-success">${approvedOrdersTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
+                  <span className="text-sm">Transaction Income</span>
+                  <span className="font-orbitron font-bold text-success">${totalIncome.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Expenses */}
+            <div className="space-y-3">
+              <h4 className="font-rajdhani font-bold text-destructive text-lg">💸 Expenses</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-destructive/10 rounded">
+                  <span className="text-sm">Transaction Expenses</span>
+                  <span className="font-orbitron font-bold text-destructive">${totalSpent.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-muted/20 rounded">
+                  <span className="text-sm">Net Transaction Balance</span>
+                  <span className={`font-orbitron font-bold ${netTransactionBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    ${netTransactionBalance.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Summary */}
+          <div className="mt-6 p-4 bg-gang-purple/20 rounded-lg border border-gang-purple/30">
+            <div className="flex justify-between items-center">
+              <span className="font-rajdhani font-bold text-lg text-gang-glow">🎯 Total Gang Funds</span>
+              <span className="text-3xl font-orbitron font-bold text-gang-neon">
+                ${totalFunds.toLocaleString()}
+              </span>
+            </div>
+            <div className="text-sm text-muted-foreground mt-2">
+              Comprehensive balance including base fund, member contributions, approved orders, and net transaction balance
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Gang Fund Management (Admin Only) */}
       {isAdmin && (

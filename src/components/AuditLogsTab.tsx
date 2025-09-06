@@ -94,7 +94,6 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         );
         
         if (paymentRecord) {
-          console.log('📋 Using payment record:', { memberId: member.id, weekNumber, paymentRecord: paymentRecord.hasPaid });
           return {
             memberId: member.id,
             memberName: member.name,
@@ -105,7 +104,6 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         }
         
         // Fallback to current payment status if no record exists
-        console.log('📋 Using member fallback:', { memberId: member.id, weekNumber, memberHasPaid: member.hasPaid });
         return {
           memberId: member.id,
           memberName: member.name,
@@ -157,8 +155,6 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const getStatusBadge = (hasPaid: boolean, memberId: string, weekNumber: number) => {
     const paymentKey = `${memberId}-${weekNumber}`;
     const isProcessing = markingPayment === paymentKey;
-    
-    console.log('🎯 getStatusBadge called:', { hasPaid, memberId, weekNumber, isProcessing, paymentKey });
 
     if (!isAdmin) {
       // For non-admin users, just show the status
@@ -175,40 +171,45 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       );
     }
 
-    // For admin users, show toggle buttons
+    // For admin users, show a single toggle button
     return (
-      <div className="flex gap-1">
-        <Badge 
-          className={`${hasPaid ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground hover:bg-success/80'} ${isProcessing ? 'opacity-50' : 'cursor-pointer'} transition-colors`}
-          onClick={!hasPaid && !isProcessing ? () => {
-            console.log('🖱️ Paid button clicked!', { memberId, weekNumber, hasPaid, isProcessing });
-            markPaymentAsPaid(memberId, weekNumber);
-          } : undefined}
-          title={!hasPaid ? (isProcessing ? "Processing..." : "Click to mark as paid") : "Already paid"}
+      <div className="flex gap-2">
+        <button
+          onClick={() => {
+            if (isProcessing) return;
+            console.log('🔄 Toggle clicked:', { memberId, weekNumber, currentStatus: hasPaid });
+            if (hasPaid) {
+              markPaymentAsPending(memberId, weekNumber);
+            } else {
+              markPaymentAsPaid(memberId, weekNumber);
+            }
+          }}
+          disabled={isProcessing}
+          className={`
+            px-3 py-1 rounded-full text-sm font-medium transition-all duration-200
+            ${isProcessing 
+              ? 'opacity-50 cursor-not-allowed' 
+              : 'cursor-pointer hover:scale-105 active:scale-95'
+            }
+            ${hasPaid 
+              ? 'bg-destructive text-destructive-foreground hover:bg-destructive/80' 
+              : 'bg-success text-success-foreground hover:bg-success/80'
+            }
+          `}
+          title={isProcessing ? "Processing..." : (hasPaid ? "Click to mark as pending" : "Click to mark as paid")}
         >
-          {isProcessing && !hasPaid ? (
-            <div className="w-3 h-3 mr-1 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          {isProcessing ? (
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              Processing...
+            </div>
           ) : (
-            <CheckCircle className="w-3 h-3 mr-1" />
+            <div className="flex items-center gap-1">
+              {hasPaid ? <XCircle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
+              {hasPaid ? 'Mark Pending' : 'Mark Paid'}
+            </div>
           )}
-          {isProcessing && !hasPaid ? "Processing..." : "Paid"}
-        </Badge>
-        
-        <Badge 
-          className={`${!hasPaid ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground hover:bg-destructive/80'} ${isProcessing ? 'opacity-50' : 'cursor-pointer'} transition-colors`}
-          onClick={hasPaid && !isProcessing ? () => {
-            console.log('🖱️ Pending button clicked!', { memberId, weekNumber, hasPaid, isProcessing });
-            markPaymentAsPending(memberId, weekNumber);
-          } : undefined}
-          title={hasPaid ? (isProcessing ? "Processing..." : "Click to mark as pending") : "Already pending"}
-        >
-          {isProcessing && hasPaid ? (
-            <div className="w-3 h-3 mr-1 animate-spin rounded-full border-2 border-white border-t-transparent" />
-          ) : (
-            <XCircle className="w-3 h-3 mr-1" />
-          )}
-          {isProcessing && hasPaid ? "Processing..." : "Pending"}
-        </Badge>
+        </button>
       </div>
     );
   };
@@ -224,25 +225,24 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const markPaymentAsPaid = async (memberId: string, weekNumber: number) => {
     const member = members.find(m => m.id === memberId);
     if (!member) {
-      console.error('Member not found:', memberId);
+      console.error('❌ Member not found:', memberId);
       return;
     }
 
     const paymentKey = `${memberId}-${weekNumber}`;
     setMarkingPayment(paymentKey);
 
-    console.log('✅ Marking payment as PAID for member:', member.name, 'week:', weekNumber);
-    console.log('📊 Current member hasPaid status:', member.hasPaid);
-
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (weekNumber - 1)));
-    weekStart.setHours(0, 0, 0, 0);
-    
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    weekEnd.setHours(23, 59, 59, 999);
+    console.log('✅ Marking as PAID:', { member: member.name, week: weekNumber });
 
     try {
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (weekNumber - 1)));
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
       // Check if record already exists
       const existingRecord = weeklyPaymentRecords.find(record => 
         record.memberId === memberId && record.weekNumber === weekNumber
@@ -256,7 +256,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
           markedBy: 'admin',
           markedAt: new Date().toISOString()
         });
-        console.log('Updated existing payment record');
+        console.log('✅ Updated existing payment record');
       } else {
         // Create new record
         await firestoreService.addWeeklyPaymentRecord({
@@ -271,18 +271,14 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
           markedBy: 'admin',
           markedAt: new Date().toISOString()
         });
-        console.log('Created new payment record');
+        console.log('✅ Created new payment record');
       }
 
-      // Update member's payment status in the main members collection
-      await firestoreService.updateMember(memberId, {
-        hasPaid: true
-      });
-
-      console.log('✅ Payment marked as PAID successfully!');
-      console.log('📊 Updated member hasPaid to:', true);
+      // Update member's payment status
+      await firestoreService.updateMember(memberId, { hasPaid: true });
+      console.log('✅ Successfully marked as PAID!');
     } catch (error) {
-      console.error('Error marking payment as paid:', error);
+      console.error('❌ Error marking as paid:', error);
     } finally {
       setMarkingPayment(null);
     }
@@ -291,25 +287,24 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const markPaymentAsPending = async (memberId: string, weekNumber: number) => {
     const member = members.find(m => m.id === memberId);
     if (!member) {
-      console.error('Member not found:', memberId);
+      console.error('❌ Member not found:', memberId);
       return;
     }
 
     const paymentKey = `${memberId}-${weekNumber}`;
     setMarkingPayment(paymentKey);
 
-    console.log('🔄 Marking payment as PENDING for member:', member.name, 'week:', weekNumber);
-    console.log('📊 Current member hasPaid status:', member.hasPaid);
-
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (weekNumber - 1)));
-    weekStart.setHours(0, 0, 0, 0);
-    
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6);
-    weekEnd.setHours(23, 59, 59, 999);
+    console.log('🔄 Marking as PENDING:', { member: member.name, week: weekNumber });
 
     try {
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (weekNumber - 1)));
+      weekStart.setHours(0, 0, 0, 0);
+      
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
       // Check if record already exists
       const existingRecord = weeklyPaymentRecords.find(record => 
         record.memberId === memberId && record.weekNumber === weekNumber
@@ -323,7 +318,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
           markedBy: 'admin',
           markedAt: new Date().toISOString()
         });
-        console.log('Updated existing payment record to pending');
+        console.log('✅ Updated existing payment record');
       } else {
         // Create new record
         await firestoreService.addWeeklyPaymentRecord({
@@ -338,18 +333,14 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
           markedBy: 'admin',
           markedAt: new Date().toISOString()
         });
-        console.log('Created new payment record as pending');
+        console.log('✅ Created new payment record');
       }
 
-      // Update member's payment status in the main members collection
-      await firestoreService.updateMember(memberId, {
-        hasPaid: false
-      });
-
-      console.log('🔄 Payment marked as PENDING successfully!');
-      console.log('📊 Updated member hasPaid to:', false);
+      // Update member's payment status
+      await firestoreService.updateMember(memberId, { hasPaid: false });
+      console.log('✅ Successfully marked as PENDING!');
     } catch (error) {
-      console.error('Error marking payment as pending:', error);
+      console.error('❌ Error marking as pending:', error);
     } finally {
       setMarkingPayment(null);
     }
@@ -549,9 +540,9 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
               <div className="border-t border-border pt-4">
                 <h4 className="font-rajdhani font-bold text-gang-glow mb-2">Leader Controls:</h4>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p>• <strong>Toggle Buttons</strong> - Click "Paid" or "Pending" buttons to change status</p>
-                  <p>• <strong>Easy Correction</strong> - Click the opposite button to undo a mistake</p>
-                  <p>• <strong>Visual Feedback</strong> - Active status is highlighted, inactive is muted</p>
+                  <p>• <strong>Single Toggle Button</strong> - Click to switch between "Paid" and "Pending" status</p>
+                  <p>• <strong>Visual Indicators</strong> - Green "Mark Paid" or Red "Mark Pending" based on current status</p>
+                  <p>• <strong>Easy Correction</strong> - One click toggles the status, no confusion</p>
                   <p>• <strong>Perfect for</strong> - Members who pay multiple weeks at once or make delayed payments</p>
                   <p>• <strong>Real-time Updates</strong> - Changes sync immediately across all users</p>
                   <p>• <strong>Admin Tracking</strong> - All changes are recorded with admin info and timestamp</p>

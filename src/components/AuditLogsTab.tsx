@@ -192,11 +192,11 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
               : 'cursor-pointer hover:scale-105 active:scale-95'
             }
             ${hasPaid 
-              ? 'bg-destructive text-destructive-foreground hover:bg-destructive/80' 
-              : 'bg-success text-success-foreground hover:bg-success/80'
+              ? 'bg-success text-success-foreground hover:bg-success/80' 
+              : 'bg-destructive text-destructive-foreground hover:bg-destructive/80'
             }
           `}
-          title={isProcessing ? "Processing..." : (hasPaid ? "Click to mark as pending" : "Click to mark as paid")}
+          title={isProcessing ? "Processing..." : (hasPaid ? "Click to change to pending" : "Click to change to paid")}
         >
           {isProcessing ? (
             <div className="flex items-center gap-1">
@@ -205,8 +205,8 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
             </div>
           ) : (
             <div className="flex items-center gap-1">
-              {hasPaid ? <XCircle className="w-3 h-3" /> : <CheckCircle className="w-3 h-3" />}
-              {hasPaid ? 'Mark Pending' : 'Mark Paid'}
+              {hasPaid ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+              {hasPaid ? 'Paid' : 'Pending'}
             </div>
           )}
         </button>
@@ -540,9 +540,10 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
               <div className="border-t border-border pt-4">
                 <h4 className="font-rajdhani font-bold text-gang-glow mb-2">Leader Controls:</h4>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p>• <strong>Single Toggle Button</strong> - Click to switch between "Paid" and "Pending" status</p>
-                  <p>• <strong>Visual Indicators</strong> - Green "Mark Paid" or Red "Mark Pending" based on current status</p>
-                  <p>• <strong>Easy Correction</strong> - One click toggles the status, no confusion</p>
+                  <p>• <strong>Status Display Button</strong> - Shows current status: Green "Paid" or Red "Pending"</p>
+                  <p>• <strong>Click to Toggle</strong> - Click the button to change to the opposite status</p>
+                  <p>• <strong>Visual Feedback</strong> - Button color and text show current status clearly</p>
+                  <p>• <strong>Easy Correction</strong> - One click toggles between paid and pending</p>
                   <p>• <strong>Perfect for</strong> - Members who pay multiple weeks at once or make delayed payments</p>
                   <p>• <strong>Real-time Updates</strong> - Changes sync immediately across all users</p>
                   <p>• <strong>Admin Tracking</strong> - All changes are recorded with admin info and timestamp</p>

@@ -97,6 +97,21 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export interface WeeklyPaymentRecord {
+  id: string;
+  memberId: string;
+  memberName: string;
+  weekStart: string;
+  weekEnd: string;
+  weekNumber: number;
+  contribution: number;
+  hasPaid: boolean;
+  paymentDate?: string;
+  markedBy: string; // Admin who marked the payment
+  markedAt: string;
+  notes?: string; // Optional notes about the payment
+}
+
 // Firestore service
 export const firestoreService = {
   // Members
@@ -239,6 +254,39 @@ export const firestoreService = {
 
   deleteAuditLog: async (id: string) => {
     return await deleteDoc(doc(db, 'auditLogs', id));
+  },
+
+  // Weekly Payment Records
+  subscribeToWeeklyPaymentRecords: (callback: (records: WeeklyPaymentRecord[]) => void) => {
+    const q = query(collection(db, 'weeklyPaymentRecords'), orderBy('weekNumber', 'desc'), orderBy('markedAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as WeeklyPaymentRecord[];
+      callback(records);
+    });
+  },
+
+  addWeeklyPaymentRecord: async (record: Omit<WeeklyPaymentRecord, 'id'>) => {
+    return await addDoc(collection(db, 'weeklyPaymentRecords'), record);
+  },
+
+  updateWeeklyPaymentRecord: async (id: string, updates: Partial<WeeklyPaymentRecord>) => {
+    return await updateDoc(doc(db, 'weeklyPaymentRecords', id), updates);
+  },
+
+  deleteWeeklyPaymentRecord: async (id: string) => {
+    return await deleteDoc(doc(db, 'weeklyPaymentRecords', id));
+  },
+
+  batchUpdateWeeklyPaymentRecords: async (updates: { id: string; updates: Partial<WeeklyPaymentRecord> }[]) => {
+    const batch = writeBatch(db);
+    updates.forEach(({ id, updates: recordUpdates }) => {
+      const recordRef = doc(db, 'weeklyPaymentRecords', id);
+      batch.update(recordRef, recordUpdates);
+    });
+    return await batch.commit();
   },
 
   // Initialize default data

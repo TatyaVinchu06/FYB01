@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Plus, UserCheck, UserX, DollarSign, Trash2, Save, Edit, Settings } from "lucide-react";
+import { Plus, UserCheck, UserX, DollarSign, Trash2, Save, Edit, Settings, GripVertical } from "lucide-react";
 import { firestoreService, Transaction, Member, GangFund, Order } from "@/lib/firestore";
 
 
@@ -11,6 +11,163 @@ import { firestoreService, Transaction, Member, GangFund, Order } from "@/lib/fi
 interface MembersTabProps {
   isAdmin: boolean;
 }
+
+interface SortableMemberItemProps {
+  member: Member;
+  index: number;
+  isAdmin: boolean;
+  editingContribution: { [key: string]: string };
+  setEditingContribution: (value: { [key: string]: string }) => void;
+  updateMemberContribution: (memberId: string) => void;
+  startEditingContribution: (memberId: string, currentAmount: number) => void;
+  togglePayment: (memberId: string) => void;
+  deleteMember: (memberId: string) => void;
+  safeFormatDate: (value: string) => string;
+  onDragStart: (e: React.DragEvent, memberId: string) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent, memberId: string) => void;
+  isDragging: boolean;
+}
+
+const SortableMemberItem = ({
+  member,
+  index,
+  isAdmin,
+  editingContribution,
+  setEditingContribution,
+  updateMemberContribution,
+  startEditingContribution,
+  togglePayment,
+  deleteMember,
+  safeFormatDate,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  isDragging,
+}: SortableMemberItemProps) => {
+  return (
+    <div
+      draggable={isAdmin}
+      onDragStart={(e) => onDragStart(e, member.id)}
+      onDragOver={onDragOver}
+      onDrop={(e) => onDrop(e, member.id)}
+      className={`flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-move ${
+        isDragging ? 'opacity-50 shadow-lg border-2 border-primary' : ''
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        {/* Drag Handle (Admin Only) */}
+        {isAdmin && (
+          <div
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+            title="Drag to reorder"
+          >
+            <GripVertical className="w-4 h-4 text-muted-foreground" />
+          </div>
+        )}
+        
+        <div className="w-10 h-10 bg-gang-purple/20 rounded-full flex items-center justify-center">
+          {member.hasPaid ? (
+            <UserCheck className="w-5 h-5 text-success" />
+          ) : (
+            <UserX className="w-5 h-5 text-destructive" />
+          )}
+        </div>
+        <div>
+          <h3 className="font-rajdhani font-bold">{member.name}</h3>
+          <p className="text-sm text-muted-foreground">
+            Joined: {safeFormatDate(member.joinDate)}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        {/* Contribution Amount - Editable for Admin */}
+        <div className="flex flex-col items-end">
+          {isAdmin && editingContribution[member.id] ? (
+            <div className="flex gap-2 items-center">
+              <Input
+                type="number"
+                value={editingContribution[member.id]}
+                onChange={(e) => setEditingContribution({
+                  ...editingContribution, 
+                  [member.id]: e.target.value
+                })}
+                className="w-24 h-8 text-sm bg-input"
+                placeholder="Amount"
+              />
+              <Button
+                onClick={() => updateMemberContribution(member.id)}
+                size="sm"
+                className="h-8 px-2 btn-gang"
+              >
+                <Save className="w-3 h-3" />
+              </Button>
+              <Button
+                onClick={() => setEditingContribution({ 
+                  ...editingContribution, 
+                  [member.id]: "" 
+                })}
+                variant="outline"
+                size="sm"
+                className="h-8 px-2"
+              >
+                ×
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-orbitron font-bold">
+                ${member.contribution}
+              </span>
+              {isAdmin && (
+                <Button
+                  onClick={() => startEditingContribution(member.id, member.contribution)}
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 hover:bg-muted"
+                >
+                  <Edit className="w-3 h-3" />
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <Badge
+          variant={member.hasPaid ? "default" : "destructive"}
+          className={member.hasPaid ? "bg-success hover:bg-success/80" : ""}
+        >
+          {member.hasPaid ? "✅ Paid" : "❌ Pending"}
+        </Badge>
+        
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button
+              variant={member.hasPaid ? "default" : "outline"}
+              size="sm"
+              onClick={() => togglePayment(member.id)}
+              className={member.hasPaid ? 
+                "bg-success hover:bg-success/80 text-white border-success" : 
+                "btn-gang-outline hover:bg-success/10 hover:border-success hover:text-success transition-colors"
+              }
+            >
+              {member.hasPaid ? "✅ Mark Unpaid" : "💰 Mark Paid"}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => deleteMember(member.id)}
+              className="bg-destructive hover:bg-destructive/80"
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const [members, setMembers] = useState<Member[]>([]);
@@ -22,6 +179,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const [editFundAmount, setEditFundAmount] = useState("");
   const [editingContribution, setEditingContribution] = useState<{ [key: string]: string }>({});
   const [creatingTestData, setCreatingTestData] = useState(false);
+  const [draggedMemberId, setDraggedMemberId] = useState<string | null>(null);
 
   const safeFormatDate = (value: string) => {
     try {
@@ -95,7 +253,8 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
         name: newMemberName.trim(),
         contribution: 500,
         hasPaid: false,
-        joinDate: new Date().toISOString().split('T')[0]
+        joinDate: new Date().toISOString().split('T')[0],
+        order: members.length // Set order as the next position
       };
       try {
         await firestoreService.addMember(newMember);
@@ -163,6 +322,51 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
     setEditingContribution({ ...editingContribution, [memberId]: currentAmount.toString() });
   };
 
+  const handleDragStart = (e: React.DragEvent, memberId: string) => {
+    setDraggedMemberId(memberId);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetMemberId: string) => {
+    e.preventDefault();
+    
+    if (!draggedMemberId || draggedMemberId === targetMemberId) {
+      setDraggedMemberId(null);
+      return;
+    }
+
+    const sortedMembers = [...members].sort((a, b) => (a.order || 0) - (b.order || 0));
+    const draggedIndex = sortedMembers.findIndex(member => member.id === draggedMemberId);
+    const targetIndex = sortedMembers.findIndex(member => member.id === targetMemberId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      setDraggedMemberId(null);
+      return;
+    }
+
+    // Create new array with reordered members
+    const reorderedMembers = [...sortedMembers];
+    const [draggedMember] = reorderedMembers.splice(draggedIndex, 1);
+    reorderedMembers.splice(targetIndex, 0, draggedMember);
+
+    // Update orders in Firestore
+    try {
+      const updatePromises = reorderedMembers.map((member, index) => 
+        firestoreService.updateMember(member.id, { order: index })
+      );
+      await Promise.all(updatePromises);
+    } catch (error) {
+      console.error('Error reordering members:', error);
+    }
+
+    setDraggedMemberId(null);
+  };
+
   const createTestData = async () => {
     setCreatingTestData(true);
     try {
@@ -174,19 +378,22 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
           name: "Big Mike",
           contribution: 500,
           hasPaid: true,
-          joinDate: "2024-01-15"
+          joinDate: "2024-01-15",
+          order: members.length
         },
         {
           name: "Lil Tony",
           contribution: 300,
           hasPaid: false,
-          joinDate: "2024-02-10"
+          joinDate: "2024-02-10",
+          order: members.length + 1
         },
         {
           name: "Purple Reign",
           contribution: 750,
           hasPaid: true,
-          joinDate: "2024-01-05"
+          joinDate: "2024-01-05",
+          order: members.length + 2
         }
       ];
       
@@ -364,121 +571,35 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
         <CardContent>
           <div className="space-y-3">
             {members && Array.isArray(members) && members.length > 0 ? (
-              members.map((member) => {
-                // Additional safety check for each member
-                if (!member || typeof member !== 'object' || !member.id) {
-                  console.error('❌ Skipping invalid member:', member);
-                  return null;
-                }
-                
-                return (
-                  <div
-                    key={member.id}
-                    className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                  >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gang-purple/20 rounded-full flex items-center justify-center">
-                    {member.hasPaid ? (
-                      <UserCheck className="w-5 h-5 text-success" />
-                    ) : (
-                      <UserX className="w-5 h-5 text-destructive" />
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="font-rajdhani font-bold">{member.name}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Joined: {safeFormatDate(member.joinDate)}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {/* Contribution Amount - Editable for Admin */}
-                  <div className="flex flex-col items-end">
-                    {isAdmin && editingContribution[member.id] ? (
-                      <div className="flex gap-2 items-center">
-                        <Input
-                          type="number"
-                          value={editingContribution[member.id]}
-                          onChange={(e) => setEditingContribution({
-                            ...editingContribution, 
-                            [member.id]: e.target.value
-                          })}
-                          className="w-24 h-8 text-sm bg-input"
-                          placeholder="Amount"
-                        />
-                        <Button
-                          onClick={() => updateMemberContribution(member.id)}
-                          size="sm"
-                          className="h-8 px-2 btn-gang"
-                        >
-                          <Save className="w-3 h-3" />
-                        </Button>
-                        <Button
-                          onClick={() => setEditingContribution({ 
-                            ...editingContribution, 
-                            [member.id]: "" 
-                          })}
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2"
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-orbitron font-bold">
-                          ${member.contribution}
-                        </span>
-                        {isAdmin && (
-                          <Button
-                            onClick={() => startEditingContribution(member.id, member.contribution)}
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0 hover:bg-muted"
-                          >
-                            <Edit className="w-3 h-3" />
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <Badge
-                    variant={member.hasPaid ? "default" : "destructive"}
-                    className={member.hasPaid ? "bg-success hover:bg-success/80" : ""}
-                  >
-                    {member.hasPaid ? "✅ Paid" : "❌ Pending"}
-                  </Badge>
+              [...members]
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map((member, index) => {
+                  // Additional safety check for each member
+                  if (!member || typeof member !== 'object' || !member.id) {
+                    console.error('❌ Skipping invalid member:', member);
+                    return null;
+                  }
                   
-                  {isAdmin && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant={member.hasPaid ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => togglePayment(member.id)}
-                        className={member.hasPaid ? 
-                          "bg-success hover:bg-success/80 text-white border-success" : 
-                          "btn-gang-outline hover:bg-success/10 hover:border-success hover:text-success transition-colors"
-                        }
-                      >
-                        {member.hasPaid ? "✅ Mark Unpaid" : "💰 Mark Paid"}
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteMember(member.id)}
-                        className="bg-destructive hover:bg-destructive/80"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              );
-              })
+                  return (
+                    <SortableMemberItem
+                      key={member.id}
+                      member={member}
+                      index={index}
+                      isAdmin={isAdmin}
+                      editingContribution={editingContribution}
+                      setEditingContribution={setEditingContribution}
+                      updateMemberContribution={updateMemberContribution}
+                      startEditingContribution={startEditingContribution}
+                      togglePayment={togglePayment}
+                      deleteMember={deleteMember}
+                      safeFormatDate={safeFormatDate}
+                      onDragStart={handleDragStart}
+                      onDragOver={handleDragOver}
+                      onDrop={handleDrop}
+                      isDragging={draggedMemberId === member.id}
+                    />
+                  );
+                })
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 <UserX className="w-12 h-12 mx-auto mb-3 opacity-50" />
@@ -511,6 +632,11 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
             )}
           </div>
         </CardContent>
+      </Card>
+    </div>
+  );
+};
+
       </Card>
     </div>
   );

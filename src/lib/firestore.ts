@@ -82,6 +82,19 @@ export interface GangFund {
   updatedBy: string;
 }
 
+export interface AuditLog {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  weekNumber: number;
+  memberId: string;
+  memberName: string;
+  hasPaid: boolean;
+  contribution: number;
+  paymentDate?: string;
+  createdAt: string;
+}
+
 // Firestore service
 export const firestoreService = {
   // Members
@@ -191,6 +204,30 @@ export const firestoreService = {
       updatedBy
     };
     return await setDoc(doc(db, 'gangfund', 'main'), fundData);
+  },
+
+  // Audit Logs
+  subscribeToAuditLogs: (callback: (auditLogs: AuditLog[]) => void) => {
+    const q = query(collection(db, 'auditLogs'), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const auditLogs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as AuditLog[];
+      callback(auditLogs);
+    });
+  },
+
+  addAuditLog: async (auditLog: Omit<AuditLog, 'id'>) => {
+    return await addDoc(collection(db, 'auditLogs'), auditLog);
+  },
+
+  updateAuditLog: async (id: string, updates: Partial<AuditLog>) => {
+    return await updateDoc(doc(db, 'auditLogs', id), updates);
+  },
+
+  deleteAuditLog: async (id: string) => {
+    return await deleteDoc(doc(db, 'auditLogs', id));
   },
 
   // Initialize default data

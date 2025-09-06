@@ -554,4 +554,3 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     </div>
   );
 };
-

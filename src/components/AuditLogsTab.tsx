@@ -142,25 +142,50 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     const paymentKey = `${memberId}-${weekNumber}`;
     const isProcessing = markingPayment === paymentKey;
 
-    return hasPaid ? (
-      <Badge className="bg-success text-success-foreground">
-        <CheckCircle className="w-3 h-3 mr-1" />
-        Paid
-      </Badge>
-    ) : (
-      <Badge 
-        variant="destructive"
-        className={`${isAdmin && !isProcessing ? 'cursor-pointer hover:bg-destructive/80 transition-colors' : ''} ${isProcessing ? 'opacity-50' : ''}`}
-        onClick={isAdmin && !isProcessing ? () => markPaymentAsPaid(memberId, weekNumber) : undefined}
-        title={isAdmin ? (isProcessing ? "Processing..." : "Click to mark as paid") : undefined}
-      >
-        {isProcessing ? (
-          <div className="w-3 h-3 mr-1 animate-spin rounded-full border-2 border-white border-t-transparent" />
-        ) : (
+    if (!isAdmin) {
+      // For non-admin users, just show the status
+      return hasPaid ? (
+        <Badge className="bg-success text-success-foreground">
+          <CheckCircle className="w-3 h-3 mr-1" />
+          Paid
+        </Badge>
+      ) : (
+        <Badge variant="destructive">
           <XCircle className="w-3 h-3 mr-1" />
-        )}
-        {isProcessing ? "Processing..." : "Pending"}
-      </Badge>
+          Pending
+        </Badge>
+      );
+    }
+
+    // For admin users, show toggle buttons
+    return (
+      <div className="flex gap-1">
+        <Badge 
+          className={`${hasPaid ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground hover:bg-success/80'} ${isProcessing ? 'opacity-50' : 'cursor-pointer'} transition-colors`}
+          onClick={!hasPaid && !isProcessing ? () => markPaymentAsPaid(memberId, weekNumber) : undefined}
+          title={!hasPaid ? (isProcessing ? "Processing..." : "Click to mark as paid") : "Already paid"}
+        >
+          {isProcessing && !hasPaid ? (
+            <div className="w-3 h-3 mr-1 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            <CheckCircle className="w-3 h-3 mr-1" />
+          )}
+          {isProcessing && !hasPaid ? "Processing..." : "Paid"}
+        </Badge>
+        
+        <Badge 
+          className={`${!hasPaid ? 'bg-destructive text-destructive-foreground' : 'bg-muted text-muted-foreground hover:bg-destructive/80'} ${isProcessing ? 'opacity-50' : 'cursor-pointer'} transition-colors`}
+          onClick={hasPaid && !isProcessing ? () => markPaymentAsPending(memberId, weekNumber) : undefined}
+          title={hasPaid ? (isProcessing ? "Processing..." : "Click to mark as pending") : "Already pending"}
+        >
+          {isProcessing && hasPaid ? (
+            <div className="w-3 h-3 mr-1 animate-spin rounded-full border-2 border-white border-t-transparent" />
+          ) : (
+            <XCircle className="w-3 h-3 mr-1" />
+          )}
+          {isProcessing && hasPaid ? "Processing..." : "Pending"}
+        </Badge>
+      </div>
     );
   };
 
@@ -232,6 +257,71 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       console.log('Payment marked as paid successfully!');
     } catch (error) {
       console.error('Error marking payment as paid:', error);
+    } finally {
+      setMarkingPayment(null);
+    }
+  };
+
+  const markPaymentAsPending = async (memberId: string, weekNumber: number) => {
+    const member = members.find(m => m.id === memberId);
+    if (!member) {
+      console.error('Member not found:', memberId);
+      return;
+    }
+
+    const paymentKey = `${memberId}-${weekNumber}`;
+    setMarkingPayment(paymentKey);
+
+    console.log('Marking payment as pending for member:', member.name, 'week:', weekNumber);
+
+    const weekStart = new Date();
+    weekStart.setDate(weekStart.getDate() - (weekStart.getDay() + 7 * (4 - weekNumber)));
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23, 59, 59, 999);
+
+    try {
+      // Check if record already exists
+      const existingRecord = weeklyPaymentRecords.find(record => 
+        record.memberId === memberId && record.weekNumber === weekNumber
+      );
+
+      if (existingRecord) {
+        // Update existing record
+        await firestoreService.updateWeeklyPaymentRecord(existingRecord.id, {
+          hasPaid: false,
+          paymentDate: undefined,
+          markedBy: 'admin',
+          markedAt: new Date().toISOString()
+        });
+        console.log('Updated existing payment record to pending');
+      } else {
+        // Create new record
+        await firestoreService.addWeeklyPaymentRecord({
+          memberId,
+          memberName: member.name,
+          weekStart: weekStart.toISOString().split('T')[0],
+          weekEnd: weekEnd.toISOString().split('T')[0],
+          weekNumber,
+          contribution: member.contribution,
+          hasPaid: false,
+          paymentDate: undefined,
+          markedBy: 'admin',
+          markedAt: new Date().toISOString()
+        });
+        console.log('Created new payment record as pending');
+      }
+
+      // Update member's payment status in the main members collection
+      await firestoreService.updateMember(memberId, {
+        hasPaid: false
+      });
+
+      console.log('Payment marked as pending successfully!');
+    } catch (error) {
+      console.error('Error marking payment as pending:', error);
     } finally {
       setMarkingPayment(null);
     }
@@ -410,10 +500,12 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
               <div className="border-t border-border pt-4">
                 <h4 className="font-rajdhani font-bold text-gang-glow mb-2">Leader Controls:</h4>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p>• <strong>Click "Pending" Badge</strong> - Click any red "Pending" badge to mark as paid</p>
-                  <p>• <strong>One-Click Marking</strong> - Simple click to mark payment for that specific week</p>
+                  <p>• <strong>Toggle Buttons</strong> - Click "Paid" or "Pending" buttons to change status</p>
+                  <p>• <strong>Easy Correction</strong> - Click the opposite button to undo a mistake</p>
+                  <p>• <strong>Visual Feedback</strong> - Active status is highlighted, inactive is muted</p>
                   <p>• <strong>Perfect for</strong> - Members who pay multiple weeks at once or make delayed payments</p>
                   <p>• <strong>Real-time Updates</strong> - Changes sync immediately across all users</p>
+                  <p>• <strong>Admin Tracking</strong> - All changes are recorded with admin info and timestamp</p>
                 </div>
               </div>
             )}

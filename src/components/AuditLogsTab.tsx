@@ -95,9 +95,18 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       // Calculate payment status for this week using weekly payment records
       const memberLogs = activeMembers.map(member => {
         // Check if there's a payment record for this member and week
-        const paymentRecord = weeklyPaymentRecords.find(record => 
+        // If multiple records exist, use the most recent one (highest markedAt)
+        const memberWeekRecords = weeklyPaymentRecords.filter(record => 
           record.memberId === member.id && record.weekNumber === weekNumber
         );
+        
+        let paymentRecord = null;
+        if (memberWeekRecords.length > 0) {
+          // Sort by markedAt descending and take the most recent
+          paymentRecord = memberWeekRecords.sort((a, b) => 
+            new Date(b.markedAt).getTime() - new Date(a.markedAt).getTime()
+          )[0];
+        }
         
         if (paymentRecord) {
           return {
@@ -249,36 +258,19 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
 
-      // Check if record already exists
-      const existingRecord = weeklyPaymentRecords.find(record => 
-        record.memberId === memberId && record.weekNumber === weekNumber
-      );
-
-      if (existingRecord) {
-        // Update existing record
-        await firestoreService.updateWeeklyPaymentRecord(existingRecord.id, {
-          hasPaid: true,
-          paymentDate: new Date().toISOString().split('T')[0],
-          markedBy: 'admin',
-          markedAt: new Date().toISOString()
-        });
-        console.log('✅ Updated existing payment record');
-      } else {
-        // Create new record
-        await firestoreService.addWeeklyPaymentRecord({
-          memberId,
-          memberName: member.name,
-          weekStart: weekStart.toISOString().split('T')[0],
-          weekEnd: weekEnd.toISOString().split('T')[0],
-          weekNumber,
-          contribution: member.contribution,
-          hasPaid: true,
-          paymentDate: new Date().toISOString().split('T')[0],
-          markedBy: 'admin',
-          markedAt: new Date().toISOString()
-        });
-        console.log('✅ Created new payment record');
-      }
+      // Use upsert to create or update the record
+      await firestoreService.upsertWeeklyPaymentRecord({
+        memberId,
+        memberName: member.name,
+        weekStart: weekStart.toISOString().split('T')[0],
+        weekEnd: weekEnd.toISOString().split('T')[0],
+        weekNumber,
+        contribution: member.contribution,
+        hasPaid: true,
+        paymentDate: new Date().toISOString().split('T')[0],
+        markedBy: 'admin',
+        markedAt: new Date().toISOString()
+      });
 
       console.log('✅ Successfully marked as PAID!');
       
@@ -320,36 +312,19 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       weekEnd.setDate(weekStart.getDate() + 6);
       weekEnd.setHours(23, 59, 59, 999);
 
-      // Check if record already exists
-      const existingRecord = weeklyPaymentRecords.find(record => 
-        record.memberId === memberId && record.weekNumber === weekNumber
-      );
-
-      if (existingRecord) {
-        // Update existing record
-        await firestoreService.updateWeeklyPaymentRecord(existingRecord.id, {
-          hasPaid: false,
-          paymentDate: undefined,
-          markedBy: 'admin',
-          markedAt: new Date().toISOString()
-        });
-        console.log('✅ Updated existing payment record');
-      } else {
-        // Create new record
-        await firestoreService.addWeeklyPaymentRecord({
-          memberId,
-          memberName: member.name,
-          weekStart: weekStart.toISOString().split('T')[0],
-          weekEnd: weekEnd.toISOString().split('T')[0],
-          weekNumber,
-          contribution: member.contribution,
-          hasPaid: false,
-          paymentDate: undefined,
-          markedBy: 'admin',
-          markedAt: new Date().toISOString()
-        });
-        console.log('✅ Created new payment record');
-      }
+      // Use upsert to create or update the record
+      await firestoreService.upsertWeeklyPaymentRecord({
+        memberId,
+        memberName: member.name,
+        weekStart: weekStart.toISOString().split('T')[0],
+        weekEnd: weekEnd.toISOString().split('T')[0],
+        weekNumber,
+        contribution: member.contribution,
+        hasPaid: false,
+        paymentDate: undefined,
+        markedBy: 'admin',
+        markedAt: new Date().toISOString()
+      });
 
       console.log('✅ Successfully marked as PENDING!');
       

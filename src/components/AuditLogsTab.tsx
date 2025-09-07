@@ -282,6 +282,12 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
 
       console.log('✅ Successfully marked as PAID!');
       
+      // Update member's current payment status ONLY if this is the current week (week 1)
+      if (weekNumber === 1) {
+        await firestoreService.updateMember(memberId, { hasPaid: true });
+        console.log('💰 Updated current member status for funds calculation');
+      }
+      
       // Force refresh of audit logs
       setTimeout(() => {
         generateAuditLogs();
@@ -346,6 +352,12 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       }
 
       console.log('✅ Successfully marked as PENDING!');
+      
+      // Update member's current payment status ONLY if this is the current week (week 1)
+      if (weekNumber === 1) {
+        await firestoreService.updateMember(memberId, { hasPaid: false });
+        console.log('💰 Updated current member status for funds calculation');
+      }
       
       // Force refresh of audit logs
       setTimeout(() => {
@@ -568,3 +580,4 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     </div>
   );
 };
+

@@ -528,5 +528,3 @@ export const OrdersTab = (props: OrdersTabProps) => {
   );
 };
 
-
-

@@ -52,7 +52,7 @@ function App() {
       <div
   className="min-h-screen bg-cover bg-center bg-no-repeat"
   style={{
-    backgroundImage: "url('https://media.discordapp.net/attachments/1411285098438852728/1413154504790245426/FYB.webp?ex=68bce071&is=68bb8ef1&hm=832953741106710ff59e94f60a3756c45a4aedc2f0b13a72ac3958ba8ddac4ab&=&format=webp&width=1349&height=758')",
+    backgroundImage: "url('https://media.discordapp.net/attachments/1411285098438852728/1413154504790245426/FYB.webp?ex=68be31f1&is=68bce071&hm=04472a95962823f6c2bb6036b7e1bc2f376fb923aa027d9d412877b9a975e898&=&format=webp&width=1349&height=758')",
     backgroundAttachment: "fixed" 
          }}
       >
@@ -72,7 +72,7 @@ function App() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
 <img
-  src="https://media.discordapp.net/attachments/1411285098438852728/1413788658615713822/LOGO.png?ex=68bd34cb&is=68bbe34b&hm=df4026821441cd5a2fe0cf288d5c56e2594f15b2c437c54c4a160a10219bf7e2&=&format=webp&quality=lossless&width=478&height=583"
+  src="https://media.discordapp.net/attachments/1411285098438852728/1413788658615713822/LOGO.png?ex=68be864b&is=68bd34cb&hm=063f325e34acec56bdc312b69d0b95712ef150e5d8b7f84e9ca7790e142ab80b&=&format=webp&quality=lossless&width=478&height=583"
   alt="FYB Logo"
   className="w-10 h-10 rounded-lg object-cover"
 />

@@ -46,6 +46,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     });
 
     const unsubscribePaymentRecords = firestoreService.subscribeToWeeklyPaymentRecords((newRecords) => {
+      console.log('📊 Weekly payment records updated:', newRecords.length);
       setWeeklyPaymentRecords(newRecords);
     });
 
@@ -65,6 +66,11 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   }, [members, orders, weeklyPaymentRecords, weeksToShow]);
 
   const generateAuditLogs = () => {
+    console.log('🔄 Generating audit logs with:', {
+      membersCount: members.length,
+      paymentRecordsCount: weeklyPaymentRecords.length,
+      weeksToShow
+    });
     const logs: WeeklyAuditLog[] = [];
     const today = new Date();
     
@@ -103,13 +109,13 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
           };
         }
         
-        // Fallback to current payment status if no record exists
+        // Fallback to pending if no record exists (don't use member.hasPaid)
         return {
           memberId: member.id,
           memberName: member.name,
-          hasPaid: member.hasPaid,
+          hasPaid: false, // Default to pending for historical weeks
           contribution: member.contribution,
-          paymentDate: member.hasPaid ? weekStart.toISOString().split('T')[0] : undefined
+          paymentDate: undefined
         };
       });
 
@@ -275,6 +281,11 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       }
 
       console.log('✅ Successfully marked as PAID!');
+      
+      // Force refresh of audit logs
+      setTimeout(() => {
+        generateAuditLogs();
+      }, 500);
     } catch (error) {
       console.error('❌ Error marking as paid:', error);
     } finally {
@@ -335,6 +346,11 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       }
 
       console.log('✅ Successfully marked as PENDING!');
+      
+      // Force refresh of audit logs
+      setTimeout(() => {
+        generateAuditLogs();
+      }, 500);
     } catch (error) {
       console.error('❌ Error marking as pending:', error);
     } finally {

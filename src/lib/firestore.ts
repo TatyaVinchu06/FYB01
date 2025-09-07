@@ -272,6 +272,57 @@ export const firestoreService = {
     return await addDoc(collection(db, 'weeklyPaymentRecords'), record);
   },
 
+  // Find existing weekly payment record for a specific member and week
+  findWeeklyPaymentRecord: async (memberId: string, weekNumber: number): Promise<WeeklyPaymentRecord | null> => {
+    try {
+      const q = query(
+        collection(db, 'weeklyPaymentRecords'), 
+        orderBy('markedAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const records = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as WeeklyPaymentRecord[];
+      
+      // Find the most recent record for this member and week
+      const existingRecord = records.find(record => 
+        record.memberId === memberId && record.weekNumber === weekNumber
+      );
+      
+      return existingRecord || null;
+    } catch (error) {
+      console.error('Error finding weekly payment record:', error);
+      return null;
+    }
+  },
+
+  // Create or update weekly payment record
+  upsertWeeklyPaymentRecord: async (record: Omit<WeeklyPaymentRecord, 'id'>): Promise<void> => {
+    try {
+      const existingRecord = await firestoreService.findWeeklyPaymentRecord(record.memberId, record.weekNumber);
+      
+      if (existingRecord) {
+        // Update existing record
+        await firestoreService.updateWeeklyPaymentRecord(existingRecord.id, {
+          hasPaid: record.hasPaid,
+          paymentDate: record.paymentDate,
+          markedBy: record.markedBy,
+          markedAt: record.markedAt,
+          contribution: record.contribution // Update contribution too in case it changed
+        });
+        console.log('✅ Updated existing weekly payment record');
+      } else {
+        // Create new record
+        await firestoreService.addWeeklyPaymentRecord(record);
+        console.log('✅ Created new weekly payment record');
+      }
+    } catch (error) {
+      console.error('Error upserting weekly payment record:', error);
+      throw error;
+    }
+  },
+
   updateWeeklyPaymentRecord: async (id: string, updates: Partial<WeeklyPaymentRecord>) => {
     return await updateDoc(doc(db, 'weeklyPaymentRecords', id), updates);
   },

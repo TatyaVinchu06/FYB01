@@ -186,10 +186,12 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       );
     }
 
-    // For admin users, show a single toggle button
+    // For admin users, show the same styled button as Members tab
     return (
       <div className="flex gap-2">
-        <button
+        <Button
+          variant={hasPaid ? "default" : "outline"}
+          size="sm"
           onClick={() => {
             if (isProcessing) return;
             console.log('🔄 Toggle clicked:', { memberId, weekNumber, currentStatus: hasPaid });
@@ -200,18 +202,10 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
             }
           }}
           disabled={isProcessing}
-          className={`
-            px-3 py-1 rounded-full text-sm font-medium transition-all duration-200
-            ${isProcessing 
-              ? 'opacity-50 cursor-not-allowed' 
-              : 'cursor-pointer hover:scale-105 active:scale-95'
-            }
-            ${hasPaid 
-              ? 'bg-success text-success-foreground hover:bg-success/80' 
-              : 'bg-destructive text-destructive-foreground hover:bg-destructive/80'
-            }
-          `}
-          title={isProcessing ? "Processing..." : (hasPaid ? "Click to change to pending" : "Click to change to paid")}
+          className={hasPaid ? 
+            "bg-success hover:bg-success/80 text-white border-success" : 
+            "btn-gang-outline hover:bg-success/10 hover:border-success hover:text-success transition-colors"
+          }
         >
           {isProcessing ? (
             <div className="flex items-center gap-1">
@@ -219,12 +213,9 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
               Processing...
             </div>
           ) : (
-            <div className="flex items-center gap-1">
-              {hasPaid ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-              {hasPaid ? 'Paid' : 'Pending'}
-            </div>
+            hasPaid ? "✅ Mark Unpaid" : "💰 Mark Paid"
           )}
-        </button>
+        </Button>
       </div>
     );
   };
@@ -511,7 +502,7 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
       <Card className="card-gang">
         <CardHeader>
           <CardTitle className="font-orbitron text-gang-glow text-sm">
-            Legend & Manual Payment Controls
+            Legend & Payment Controls
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -539,11 +530,11 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
               <div className="border-t border-border pt-4">
                 <h4 className="font-rajdhani font-bold text-gang-glow mb-2">Leader Controls:</h4>
                 <div className="text-sm text-muted-foreground space-y-1">
-                  <p>• <strong>Status Display Button</strong> - Shows current status: Green "Paid" or Red "Pending"</p>
-                  <p>• <strong>Click to Toggle</strong> - Click the button to change to the opposite status</p>
-                  <p>• <strong>Visual Feedback</strong> - Button color and text show current status clearly</p>
-                  <p>• <strong>Easy Correction</strong> - One click toggles between paid and pending</p>
-                  <p>• <strong>Perfect for</strong> - Members who pay multiple weeks at once or make delayed payments</p>
+                  <p>• <strong>Payment Status Buttons</strong> - Same as Members tab: Green "✅ Mark Unpaid" or Blue "💰 Mark Paid"</p>
+                  <p>• <strong>Click to Toggle</strong> - Click the button to change payment status for that specific week</p>
+                  <p>• <strong>Visual Feedback</strong> - Button style matches current status (Paid = Green, Pending = Blue outline)</p>
+                  <p>• <strong>Current Week Sync</strong> - Week 1 changes also update Members tab and funds</p>
+                  <p>• <strong>Historical Tracking</strong> - Historical weeks (2+) are tracked independently</p>
                   <p>• <strong>Real-time Updates</strong> - Changes sync immediately across all users</p>
                   <p>• <strong>Admin Tracking</strong> - All changes are recorded with admin info and timestamp</p>
                 </div>
@@ -555,4 +546,3 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     </div>
   );
 };
-

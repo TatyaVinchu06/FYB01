@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, UserCheck, UserX, DollarSign, Trash2, Save, Edit, Settings, GripVertical } from "lucide-react";
-import { firestoreService, Transaction, Member, GangFund, Order } from "@/lib/firestore";
+import { firestoreService, Transaction, Member, GangFund, Order, WeeklyPaymentRecord } from "@/lib/firestore";
 
 
 
@@ -173,6 +173,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [weeklyPaymentRecords, setWeeklyPaymentRecords] = useState<WeeklyPaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [newMemberName, setNewMemberName] = useState("");
   const [gangFund, setGangFund] = useState<GangFund | null>(null);
@@ -273,10 +274,16 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
       setTransactions(newTransactions);
     });
 
+    const unsubscribePaymentRecords = firestoreService.subscribeToWeeklyPaymentRecords((newRecords) => {
+      console.log('📊 Members tab received payment records:', newRecords.length);
+      setWeeklyPaymentRecords(newRecords);
+    });
+
     return () => {
       unsubscribeMembers();
       unsubscribeOrders();
       unsubscribeTransactions();
+      unsubscribePaymentRecords();
     };
   }, []);
 
@@ -503,8 +510,35 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
     }
   };
 
+  // Calculate total collected from audit logs (all weekly payment records)
+  const calculateAuditLogsTotalCollected = () => {
+    // Create a map to store the most recent record for each member-week combination
+    const memberWeekMap = new Map<string, WeeklyPaymentRecord>();
+    
+    weeklyPaymentRecords.forEach(record => {
+      const key = `${record.memberId}-${record.weekNumber}`;
+      const existing = memberWeekMap.get(key);
+      
+      // Keep the most recent record (highest markedAt)
+      if (!existing || new Date(record.markedAt) > new Date(existing.markedAt)) {
+        memberWeekMap.set(key, record);
+      }
+    });
+    
+    // Sum up contributions from paid records
+    let totalCollected = 0;
+    memberWeekMap.forEach(record => {
+      if (record.hasPaid) {
+        totalCollected += record.contribution;
+      }
+    });
+    
+    return totalCollected;
+  };
+
   const paidMembers = members.filter(m => m.hasPaid);
-  const totalContributions = paidMembers.reduce((sum, member) => sum + member.contribution, 0);
+  const currentWeekContributions = paidMembers.reduce((sum, member) => sum + member.contribution, 0);
+  const auditLogsTotalCollected = calculateAuditLogsTotalCollected();
   const baseAmount = gangFund?.baseAmount || 20000;
   
   // Add approved orders to collected funds
@@ -517,8 +551,8 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, inc) => sum + inc.amount, 0);
   const netTransactionBalance = totalIncome - totalSpent;
   
-  // Calculate comprehensive total funds
-  const totalFunds = baseAmount + totalContributions + approvedOrdersTotal + netTransactionBalance;
+  // Calculate comprehensive total funds using audit logs data
+  const totalFunds = baseAmount + auditLogsTotalCollected + approvedOrdersTotal + netTransactionBalance;
 
   if (loading) {
     return (
@@ -569,7 +603,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
               ${totalFunds.toLocaleString()}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              Base: ${baseAmount.toLocaleString()} + Members: ${totalContributions.toLocaleString()} + Orders: ${approvedOrdersTotal.toLocaleString()} + Net: ${netTransactionBalance.toLocaleString()}
+              Base: ${baseAmount.toLocaleString()} + Audit Total: ${auditLogsTotalCollected.toLocaleString()} + Orders: ${approvedOrdersTotal.toLocaleString()} + Net: ${netTransactionBalance.toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -608,8 +642,12 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
                   <span className="font-orbitron font-bold text-success">${baseAmount.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Member Contributions</span>
-                  <span className="font-orbitron font-bold text-success">${totalContributions.toLocaleString()}</span>
+                  <span className="text-sm">Audit Logs Total Collected</span>
+                  <span className="font-orbitron font-bold text-success">${auditLogsTotalCollected.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-success/20 rounded">
+                  <span className="text-sm">Current Week Contributions</span>
+                  <span className="font-orbitron font-bold text-success">${currentWeekContributions.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center p-2 bg-success/10 rounded">
                   <span className="text-sm">Approved Orders</span>
@@ -649,7 +687,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
               </span>
             </div>
             <div className="text-sm text-muted-foreground mt-2">
-              Comprehensive balance including base fund, member contributions, approved orders, and net transaction balance
+              Comprehensive balance including base fund, audit logs total collected, approved orders, and net transaction balance
             </div>
           </div>
         </CardContent>

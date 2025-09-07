@@ -274,8 +274,6 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         console.log('✅ Created new payment record');
       }
 
-      // Update member's payment status
-      await firestoreService.updateMember(memberId, { hasPaid: true });
       console.log('✅ Successfully marked as PAID!');
     } catch (error) {
       console.error('❌ Error marking as paid:', error);
@@ -336,8 +334,6 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         console.log('✅ Created new payment record');
       }
 
-      // Update member's payment status
-      await firestoreService.updateMember(memberId, { hasPaid: false });
       console.log('✅ Successfully marked as PENDING!');
     } catch (error) {
       console.error('❌ Error marking as pending:', error);

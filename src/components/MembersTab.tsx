@@ -172,6 +172,7 @@ const SortableMemberItem = ({
 export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [newMemberName, setNewMemberName] = useState("");
   const [gangFund, setGangFund] = useState<GangFund | null>(null);
@@ -268,9 +269,14 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
       setOrders(newOrders);
     });
 
+    const unsubscribeTransactions = firestoreService.subscribeToTransactions((newTransactions) => {
+      setTransactions(newTransactions);
+    });
+
     return () => {
       unsubscribeMembers();
       unsubscribeOrders();
+      unsubscribeTransactions();
     };
   }, []);
 
@@ -314,14 +320,24 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const togglePayment = async (memberId: string) => {
     const member = members.find(m => m.id === memberId);
     if (member) {
+      const newPaidStatus = !member.hasPaid;
+      
       // Optimistic update - update local state immediately
       const updatedMembers = members.map(m => 
-        m.id === memberId ? { ...m, hasPaid: !m.hasPaid } : m
+        m.id === memberId ? { ...m, hasPaid: newPaidStatus } : m
       );
       setMembers(updatedMembers);
 
       try {
-        await firestoreService.updateMember(memberId, { hasPaid: !member.hasPaid });
+        // Update member's current status
+        await firestoreService.updateMember(memberId, { hasPaid: newPaidStatus });
+        
+        // Also update weekly payment record for current week (week 1)
+        await updateCurrentWeekPaymentRecord(memberId, member, newPaidStatus);
+        
+        console.log(`✅ Updated payment status for ${member.name}: ${newPaidStatus ? 'PAID' : 'PENDING'}`);
+        console.log('📊 Weekly payment record synchronized with audit logs');
+        
       } catch (error) {
         console.error('Error updating member:', error);
         // Revert optimistic update on error
@@ -330,6 +346,37 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
         );
         setMembers(revertedMembers);
       }
+    }
+  };
+
+  const updateCurrentWeekPaymentRecord = async (memberId: string, member: Member, hasPaid: boolean) => {
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay()); // Start of current week (Sunday)
+    weekStart.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6); // End of current week (Saturday)
+    weekEnd.setHours(23, 59, 59, 999);
+    
+    const weekNumber = 1; // Current week is always week 1 in audit logs
+    
+    try {
+      await firestoreService.upsertWeeklyPaymentRecord({
+        memberId,
+        memberName: member.name,
+        weekStart: weekStart.toISOString().split('T')[0],
+        weekEnd: weekEnd.toISOString().split('T')[0],
+        weekNumber,
+        contribution: member.contribution,
+        hasPaid: hasPaid,
+        paymentDate: hasPaid ? new Date().toISOString().split('T')[0] : undefined,
+        markedBy: 'admin',
+        markedAt: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error('Error updating weekly payment record:', error);
+      // Don't throw - member status update should still succeed
     }
   };
 
@@ -465,7 +512,13 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
     .filter(order => order.status === 'approved' || order.status === 'completed')
     .reduce((sum, order) => sum + order.totalAmount, 0);
   
-  const totalFunds = baseAmount + totalContributions + approvedOrdersTotal;
+  // Calculate net balance from transactions (Money Moves)
+  const totalSpent = transactions.filter(t => t.type === 'expense').reduce((sum, exp) => sum + exp.amount, 0);
+  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, inc) => sum + inc.amount, 0);
+  const netTransactionBalance = totalIncome - totalSpent;
+  
+  // Calculate comprehensive total funds
+  const totalFunds = baseAmount + totalContributions + approvedOrdersTotal + netTransactionBalance;
 
   if (loading) {
     return (
@@ -508,12 +561,15 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-rajdhani text-muted-foreground">
               <DollarSign className="w-4 h-4 inline mr-1" />
-              Collected Funds
+              Total Gang Funds
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-orbitron font-bold text-gang-neon">
               ${totalFunds.toLocaleString()}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Base: ${baseAmount.toLocaleString()} + Members: ${totalContributions.toLocaleString()} + Orders: ${approvedOrdersTotal.toLocaleString()} + Net: ${netTransactionBalance.toLocaleString()}
             </div>
           </CardContent>
         </Card>
@@ -532,6 +588,72 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Comprehensive Financial Overview */}
+      <Card className="card-gang">
+        <CardHeader>
+          <CardTitle className="font-orbitron text-gang-glow flex items-center">
+            <DollarSign className="w-5 h-5 mr-2" />
+            💰 Comprehensive Financial Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Income Sources */}
+            <div className="space-y-3">
+              <h4 className="font-rajdhani font-bold text-success text-lg">💰 Income Sources</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
+                  <span className="text-sm">Base Gang Fund</span>
+                  <span className="font-orbitron font-bold text-success">${baseAmount.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
+                  <span className="text-sm">Member Contributions</span>
+                  <span className="font-orbitron font-bold text-success">${totalContributions.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
+                  <span className="text-sm">Approved Orders</span>
+                  <span className="font-orbitron font-bold text-success">${approvedOrdersTotal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
+                  <span className="text-sm">Transaction Income</span>
+                  <span className="font-orbitron font-bold text-success">${totalIncome.toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Expenses */}
+            <div className="space-y-3">
+              <h4 className="font-rajdhani font-bold text-destructive text-lg">💸 Expenses</h4>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 bg-destructive/10 rounded">
+                  <span className="text-sm">Transaction Expenses</span>
+                  <span className="font-orbitron font-bold text-destructive">${totalSpent.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center p-2 bg-muted/20 rounded">
+                  <span className="text-sm">Net Transaction Balance</span>
+                  <span className={`font-orbitron font-bold ${netTransactionBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    ${netTransactionBalance.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Summary */}
+          <div className="mt-6 p-4 bg-gang-purple/20 rounded-lg border border-gang-purple/30">
+            <div className="flex justify-between items-center">
+              <span className="font-rajdhani font-bold text-lg text-gang-glow">🎯 Total Gang Funds</span>
+              <span className="text-3xl font-orbitron font-bold text-gang-neon">
+                ${totalFunds.toLocaleString()}
+              </span>
+            </div>
+            <div className="text-sm text-muted-foreground mt-2">
+              Comprehensive balance including base fund, member contributions, approved orders, and net transaction balance
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Gang Fund Management (Admin Only) */}
       {isAdmin && (

@@ -52,7 +52,7 @@ function App() {
       <div
   className="min-h-screen bg-cover bg-center bg-no-repeat"
   style={{
-    backgroundImage: "url('https://media.discordapp.net/attachments/1411285098438852728/1413154504790245426/FYB.webp?ex=68be31f1&is=68bce071&hm=04472a95962823f6c2bb6036b7e1bc2f376fb923aa027d9d412877b9a975e898&=&format=webp&width=1349&height=758')",
+    backgroundImage: "url('https://i.vgy.me/1OKlJA.jpg')",
     backgroundAttachment: "fixed" 
          }}
       >

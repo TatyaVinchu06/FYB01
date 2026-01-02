@@ -1,873 +1,830 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Plus, UserCheck, UserX, DollarSign, Trash2, Save, Edit, Settings, GripVertical } from "lucide-react";
-import { firestoreService, Transaction, Member, GangFund, Order, WeeklyPaymentRecord } from "@/lib/firestore";
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-
-interface MembersTabProps {
-  isAdmin: boolean;
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Supabase configuration is incomplete. Please check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
 }
 
-interface SortableMemberItemProps {
-  member: Member;
-  index: number;
-  isAdmin: boolean;
-  editingContribution: { [key: string]: string };
-  setEditingContribution: (value: { [key: string]: string }) => void;
-  updateMemberContribution: (memberId: string) => void;
-  startEditingContribution: (memberId: string, currentAmount: number) => void;
-  togglePayment: (memberId: string) => void;
-  deleteMember: (memberId: string) => void;
-  safeFormatDate: (value: string) => string;
-  onDragStart: (e: React.DragEvent, memberId: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent, memberId: string) => void;
-  isDragging: boolean;
+const supabase: SupabaseClient = createClient(supabaseUrl!, supabaseKey!);
+
+// Types
+export interface Member {
+  id: string;
+  name: string;
+  contribution: number;
+  hasPaid: boolean;
+  joinDate: string;
+  order: number; // For drag-and-drop reordering
 }
 
-const SortableMemberItem = ({
-  member,
-  index,
-  isAdmin,
-  editingContribution,
-  setEditingContribution,
-  updateMemberContribution,
-  startEditingContribution,
-  togglePayment,
-  deleteMember,
-  safeFormatDate,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  isDragging,
-}: SortableMemberItemProps) => {
-  return (
-    <div
-      draggable={isAdmin}
-      onDragStart={(e) => onDragStart(e, member.id)}
-      onDragOver={onDragOver}
-      onDrop={(e) => onDrop(e, member.id)}
-      className={`flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-move ${
-        isDragging ? 'opacity-50 shadow-lg border-2 border-primary' : ''
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        {/* Drag Handle (Admin Only) */}
-        {isAdmin && (
-          <div
-            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
-            title="Drag to reorder"
-          >
-            <GripVertical className="w-4 h-4 text-muted-foreground" />
-          </div>
-        )}
-        
-        <div className="w-10 h-10 bg-gang-purple/20 rounded-full flex items-center justify-center">
-          {member.hasPaid ? (
-            <UserCheck className="w-5 h-5 text-success" />
-          ) : (
-            <UserX className="w-5 h-5 text-destructive" />
-          )}
-        </div>
-        <div>
-          <h3 className="font-rajdhani font-bold">{member.name}</h3>
-          <p className="text-sm text-muted-foreground">
-            Joined: {safeFormatDate(member.joinDate)}
-          </p>
-        </div>
-      </div>
+export interface Transaction {
+  id: string;
+  description: string;
+  amount: number;
+  date: string;
+  type: 'income' | 'expense';
+  category: string;
+}
 
-      <div className="flex items-center gap-3">
-        {/* Contribution Amount - Editable for Admin */}
-        <div className="flex flex-col items-end">
-          {isAdmin && editingContribution[member.id] ? (
-            <div className="flex gap-2 items-center">
-              <Input
-                type="number"
-                value={editingContribution[member.id]}
-                onChange={(e) => setEditingContribution({
-                  ...editingContribution, 
-                  [member.id]: e.target.value
-                })}
-                className="w-24 h-8 text-sm bg-input"
-                placeholder="Amount"
-              />
-              <Button
-                onClick={() => updateMemberContribution(member.id)}
-                size="sm"
-                className="h-8 px-2 btn-gang"
-              >
-                <Save className="w-3 h-3" />
-              </Button>
-              <Button
-                onClick={() => setEditingContribution({ 
-                  ...editingContribution, 
-                  [member.id]: "" 
-                })}
-                variant="outline"
-                size="sm"
-                className="h-8 px-2"
-              >
-                ×
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-orbitron font-bold">
-                ${member.contribution}
-              </span>
-              {isAdmin && (
-                <Button
-                  onClick={() => startEditingContribution(member.id, member.contribution)}
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-muted"
-                >
-                  <Edit className="w-3 h-3" />
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
+export interface Item {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  description?: string;
+}
 
-        <Badge
-          variant={member.hasPaid ? "default" : "destructive"}
-          className={member.hasPaid ? "bg-success hover:bg-success/80" : ""}
-        >
-          {member.hasPaid ? "✅ Paid" : "❌ Pending"}
-        </Badge>
-        
-        {isAdmin && (
-          <div className="flex gap-2">
-            <Button
-              variant={member.hasPaid ? "default" : "outline"}
-              size="sm"
-              onClick={() => togglePayment(member.id)}
-              className={member.hasPaid ? 
-                "bg-success hover:bg-success/80 text-white border-success" : 
-                "btn-gang-outline hover:bg-success/10 hover:border-success hover:text-success transition-colors"
+export interface Order {
+  id: string;
+  memberId: string;
+  memberName: string;
+  items: {
+    itemId: string;
+    itemName: string;
+    quantity: number;
+    price: number;
+  }[];
+  totalAmount: number;
+  status: 'pending' | 'approved' | 'completed' | 'cancelled';
+  orderDate: string;
+}
+
+export interface GangFund {
+  id: string;
+  baseAmount: number;
+  lastUpdated: string;
+  updatedBy: string;
+}
+
+export interface AuditLog {
+  id: string;
+  weekStart: string;
+  weekEnd: string;
+  weekNumber: number;
+  memberId: string;
+  memberName: string;
+  hasPaid: boolean;
+  contribution: number;
+  paymentDate?: string;
+  createdAt: string;
+}
+
+export interface WeeklyPaymentRecord {
+  id: string;
+  memberId: string;
+  memberName: string;
+  weekStart: string;
+  weekEnd: string;
+  weekNumber: number;
+  contribution: number;
+  hasPaid: boolean;
+  paymentDate?: string;
+  markedBy: string; // Admin who marked the payment
+  markedAt: string;
+  notes?: string; // Optional notes about the payment
+}
+
+// Supabase service
+export const supabaseService = {
+  // Members
+  subscribeToMembers: (callback: (members: Member[]) => void) => {
+    // Real-time subscription to members table
+    const subscription = supabase
+      .channel('members-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'members',
+        },
+        (payload) => {
+          // Refresh all members when any change occurs
+          supabase
+            .from('members')
+            .select('*')
+            .order('order', { ascending: true })
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('Error fetching members:', error);
+              } else {
+                callback(data as Member[]);
               }
-            >
-              {member.hasPaid ? "✅ Mark Unpaid" : "💰 Mark Paid"}
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => deleteMember(member.id)}
-              className="bg-destructive hover:bg-destructive/80"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export const MembersTab = ({ isAdmin }: MembersTabProps) => {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [weeklyPaymentRecords, setWeeklyPaymentRecords] = useState<WeeklyPaymentRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
-  const [newMemberName, setNewMemberName] = useState("");
-  const [gangFund, setGangFund] = useState<GangFund | null>(null);
-  const [isEditingFunds, setIsEditingFunds] = useState(false);
-  const [editFundAmount, setEditFundAmount] = useState("");
-  const [editingContribution, setEditingContribution] = useState<{ [key: string]: string }>({});
-  const [creatingTestData, setCreatingTestData] = useState(false);
-  const [draggedMemberId, setDraggedMemberId] = useState<string | null>(null);
-  const [lastResetDate, setLastResetDate] = useState<string | null>(null);
-
-  const safeFormatDate = (value: string) => {
-    try {
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) return value || 'Unknown';
-      return d.toLocaleDateString();
-    } catch {
-      return value || 'Unknown';
-    }
-  };
-
-  const checkAndResetWeeklyPayments = async () => {
-    const today = new Date();
-    const todayString = today.toISOString().split('T')[0];
-    
-    // Check if today is Sunday (day 0)
-    const isSunday = today.getDay() === 0;
-    
-    // Check if we've already reset this week
-    const lastReset = localStorage.getItem('lastWeeklyReset');
-    
-    if (isSunday && lastReset !== todayString) {
-      console.log('🔄 It\'s Sunday! Resetting all member payments...');
-      
-      try {
-        // Get all members who have paid
-        const paidMembers = members.filter(member => member.hasPaid);
-        
-        if (paidMembers.length > 0) {
-          // Batch update all paid members to unpaid
-          const updates = paidMembers.map(member => ({
-            id: member.id,
-            updates: { hasPaid: false }
-          }));
-          
-          await firestoreService.batchUpdateMembers(updates);
-          
-          // Update localStorage to track last reset
-          localStorage.setItem('lastWeeklyReset', todayString);
-          setLastResetDate(todayString);
-          
-          console.log(`✅ Reset ${paidMembers.length} members' payment status for the new week`);
+            });
         }
-      } catch (error) {
-        console.error('❌ Error resetting weekly payments:', error);
-      }
-    }
-  };
+      )
+      .subscribe();
 
-  // Subscribe to real-time updates
-  useEffect(() => {
-    // Set a timeout to stop loading state if data doesn't load within 10 seconds
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      setLoadError(true);
-    }, 10000);
-    
-    const unsubscribeMembers = firestoreService.subscribeToMembers((newMembers) => {
-      console.log('📥 Received members data:', newMembers);
-      
-      // Clear timeout and hide error when data is received
-      clearTimeout(timeoutId);
-      setLoadError(false);
-      
-      // Validate that we have an array
-      if (!Array.isArray(newMembers)) {
-        console.error('❌ Expected array of members, got:', typeof newMembers, newMembers);
-        setMembers([]);
-        setLoading(false);
-        return;
-      }
-      
-      // Validate each member object
-      const validMembers = newMembers.filter(member => {
-        const isValid = member && 
-          typeof member === 'object' && 
-          typeof member.id === 'string' && 
-          typeof member.name === 'string' && 
-          typeof member.contribution === 'number' && 
-          typeof member.hasPaid === 'boolean' && 
-          typeof member.joinDate === 'string';
-        
-        if (!isValid) {
-          console.error('❌ Invalid member data:', member);
+    // Initial load
+    supabase
+      .from('members')
+      .select('*')
+      .order('order', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching members:', error);
+        } else {
+          callback(data as Member[]);
         }
-        
-        return isValid;
       });
-      
-      setMembers(validMembers);
-      setLoading(false);
-    });
 
-    const unsubscribeOrders = firestoreService.subscribeToOrders((newOrders) => {
-      setOrders(newOrders);
-    });
+    // Return unsubscribe function
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  },
 
-    const unsubscribeTransactions = firestoreService.subscribeToTransactions((newTransactions) => {
-      setTransactions(newTransactions);
-    });
+  getMembers: async (): Promise<Member[]> => {
+    const { data, error } = await supabase
+      .from('members')
+      .select('*')
+      .order('order', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching members:', error);
+      return [];
+    }
+    return data as Member[];
+  },
 
-    const unsubscribePaymentRecords = firestoreService.subscribeToWeeklyPaymentRecords((newRecords) => {
-      console.log('📊 Members tab received payment records:', newRecords.length);
-      setWeeklyPaymentRecords(newRecords);
-    });
+  addMember: async (member: Omit<Member, 'id'>) => {
+    const { data, error } = await supabase
+      .from('members')
+      .insert([member])
+      .select();
+    
+    if (error) {
+      console.error('Error adding member:', error);
+      throw error;
+    }
+    return data[0];
+  },
+
+  updateMember: async (id: string, updates: Partial<Member>) => {
+    const { error } = await supabase
+      .from('members')
+      .update(updates)
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error updating member:', error);
+      throw error;
+    }
+  },
+
+  deleteMember: async (id: string) => {
+    const { error } = await supabase
+      .from('members')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting member:', error);
+      throw error;
+    }
+  },
+
+  // Transactions
+  subscribeToTransactions: (callback: (transactions: Transaction[]) => void) => {
+    const subscription = supabase
+      .channel('transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'transactions',
+        },
+        (payload) => {
+          supabase
+            .from('transactions')
+            .select('*')
+            .order('date', { ascending: false })
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('Error fetching transactions:', error);
+              } else {
+                callback(data as Transaction[]);
+              }
+            });
+        }
+      )
+      .subscribe();
+
+    // Initial load
+    supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching transactions:', error);
+        } else {
+          callback(data as Transaction[]);
+        }
+      });
 
     return () => {
-      clearTimeout(timeoutId);
-      unsubscribeMembers();
-      unsubscribeOrders();
-      unsubscribeTransactions();
-      unsubscribePaymentRecords();
+      supabase.removeChannel(subscription);
     };
-  }, []);
+  },
 
-  // Subscribe to gang fund updates
-  useEffect(() => {
-    const unsubscribe = firestoreService.subscribeToGangFund((fundData) => {
-      setGangFund(fundData);
-      if (fundData && !editFundAmount) {
-        setEditFundAmount(fundData.baseAmount.toString());
-      }
-    });
-
-    return () => unsubscribe();
-  }, [editFundAmount]);
-
-  // Check for weekly reset on component mount and when members change
-  useEffect(() => {
-    if (members.length > 0) {
-      checkAndResetWeeklyPayments();
-    }
-  }, [members]);
-
-  const addMember = async () => {
-    if (newMemberName.trim()) {
-      const newMember = {
-        name: newMemberName.trim(),
-        contribution: 500,
-        hasPaid: false,
-        joinDate: new Date().toISOString().split('T')[0],
-        order: members.length // Set order as the next position
-      };
-      try {
-        await firestoreService.addMember(newMember);
-        setNewMemberName("");
-      } catch (error) {
-        console.error('Error adding member:', error);
-      }
-    }
-  };
-
-  const togglePayment = async (memberId: string) => {
-    const member = members.find(m => m.id === memberId);
-    if (member) {
-      const newPaidStatus = !member.hasPaid;
-      
-      // Optimistic update - update local state immediately
-      const updatedMembers = members.map(m => 
-        m.id === memberId ? { ...m, hasPaid: newPaidStatus } : m
-      );
-      setMembers(updatedMembers);
-
-      try {
-        // Update member's current status
-        await firestoreService.updateMember(memberId, { hasPaid: newPaidStatus });
-        
-        // Also update weekly payment record for current week (week 1)
-        await updateCurrentWeekPaymentRecord(memberId, member, newPaidStatus);
-        
-        console.log(`✅ Updated payment status for ${member.name}: ${newPaidStatus ? 'PAID' : 'PENDING'}`);
-        console.log('📊 Weekly payment record synchronized with audit logs');
-        
-      } catch (error) {
-        console.error('Error updating member:', error);
-        // Revert optimistic update on error
-        const revertedMembers = members.map(m => 
-          m.id === memberId ? { ...m, hasPaid: member.hasPaid } : m
-        );
-        setMembers(revertedMembers);
-      }
-    }
-  };
-
-  const updateCurrentWeekPaymentRecord = async (memberId: string, member: Member, hasPaid: boolean) => {
-    const today = new Date();
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay()); // Start of current week (Sunday)
-    weekStart.setHours(0, 0, 0, 0);
+  getTransactions: async (): Promise<Transaction[]> => {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false });
     
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6); // End of current week (Saturday)
-    weekEnd.setHours(23, 59, 59, 999);
+    if (error) {
+      console.error('Error fetching transactions:', error);
+      return [];
+    }
+    return data as Transaction[];
+  },
+
+  addTransaction: async (transaction: Omit<Transaction, 'id'>) => {
+    const { data, error } = await supabase
+      .from('transactions')
+      .insert([transaction])
+      .select();
     
-    const weekNumber = 1; // Current week is always week 1 in audit logs
+    if (error) {
+      console.error('Error adding transaction:', error);
+      throw error;
+    }
+    return data[0];
+  },
+
+  deleteTransaction: async (id: string) => {
+    const { error } = await supabase
+      .from('transactions')
+      .delete()
+      .eq('id', id);
     
-    try {
-      await firestoreService.upsertWeeklyPaymentRecord({
-        memberId,
-        memberName: member.name,
-        weekStart: weekStart.toISOString().split('T')[0],
-        weekEnd: weekEnd.toISOString().split('T')[0],
-        weekNumber,
-        contribution: member.contribution,
-        hasPaid: hasPaid,
-        paymentDate: hasPaid ? new Date().toISOString().split('T')[0] : undefined,
-        markedBy: 'admin',
-        markedAt: new Date().toISOString()
-      });
-    } catch (error) {
-      console.error('Error updating weekly payment record:', error);
-      // Don't throw - member status update should still succeed
+    if (error) {
+      console.error('Error deleting transaction:', error);
+      throw error;
     }
-  };
+  },
 
-  const deleteMember = async (memberId: string) => {
-    try {
-      await firestoreService.deleteMember(memberId);
-    } catch (error) {
-      console.error('Error deleting member:', error);
-    }
-  };
-
-  const updateGangFund = async () => {
-    if (editFundAmount.trim()) {
-      try {
-        await firestoreService.updateGangFund(parseFloat(editFundAmount), 'admin');
-        setIsEditingFunds(false);
-      } catch (error) {
-        console.error('Error updating gang fund:', error);
-      }
-    }
-  };
-
-  const updateMemberContribution = async (memberId: string) => {
-    const newAmount = editingContribution[memberId];
-    if (newAmount && !isNaN(parseFloat(newAmount))) {
-      try {
-        await firestoreService.updateMember(memberId, { contribution: parseFloat(newAmount) });
-        setEditingContribution({ ...editingContribution, [memberId]: "" });
-      } catch (error) {
-        console.error('Error updating contribution:', error);
-      }
-    }
-  };
-
-  const startEditingContribution = (memberId: string, currentAmount: number) => {
-    setEditingContribution({ ...editingContribution, [memberId]: currentAmount.toString() });
-  };
-
-  const handleDragStart = (e: React.DragEvent, memberId: string) => {
-    setDraggedMemberId(memberId);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetMemberId: string) => {
-    e.preventDefault();
-    
-    if (!draggedMemberId || draggedMemberId === targetMemberId) {
-      setDraggedMemberId(null);
-      return;
-    }
-
-    const sortedMembers = [...members].sort((a, b) => (a.order || 0) - (b.order || 0));
-    const draggedIndex = sortedMembers.findIndex(member => member.id === draggedMemberId);
-    const targetIndex = sortedMembers.findIndex(member => member.id === targetMemberId);
-
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedMemberId(null);
-      return;
-    }
-
-    // Create new array with reordered members
-    const reorderedMembers = [...sortedMembers];
-    const [draggedMember] = reorderedMembers.splice(draggedIndex, 1);
-    reorderedMembers.splice(targetIndex, 0, draggedMember);
-
-    // Update orders in Firestore
-    try {
-      const updatePromises = reorderedMembers.map((member, index) => 
-        firestoreService.updateMember(member.id, { order: index })
-      );
-      await Promise.all(updatePromises);
-    } catch (error) {
-      console.error('Error reordering members:', error);
-    }
-
-    setDraggedMemberId(null);
-  };
-
-  const createTestData = async () => {
-    setCreatingTestData(true);
-    try {
-      console.log('🎯 Creating test members...');
-      
-      // Create test members with gang-themed names
-      const testMembers = [
+  // Items
+  subscribeToItems: (callback: (items: Item[]) => void) => {
+    const subscription = supabase
+      .channel('items-changes')
+      .on(
+        'postgres_changes',
         {
-          name: "Big Mike",
-          contribution: 500,
-          hasPaid: true,
-          joinDate: "2024-01-15",
-          order: members.length
+          event: '*',
+          schema: 'public',
+          table: 'items',
         },
-        {
-          name: "Lil Tony",
-          contribution: 300,
-          hasPaid: false,
-          joinDate: "2024-02-10",
-          order: members.length + 1
-        },
-        {
-          name: "Purple Reign",
-          contribution: 750,
-          hasPaid: true,
-          joinDate: "2024-01-05",
-          order: members.length + 2
+        (payload) => {
+          supabase
+            .from('items')
+            .select('*')
+            .order('name', { ascending: true })
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('Error fetching items:', error);
+              } else {
+                callback(data as Item[]);
+              }
+            });
         }
-      ];
-      
-      for (const member of testMembers) {
-        await firestoreService.addMember(member);
-        console.log('✅ Added member:', member.name);
-      }
-      
-      console.log('✅ All test members recruited!');
-    } catch (error) {
-      console.error('❌ Error recruiting members:', error);
-    } finally {
-      setCreatingTestData(false);
+      )
+      .subscribe();
+
+    // Initial load
+    supabase
+      .from('items')
+      .select('*')
+      .order('name', { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching items:', error);
+        } else {
+          callback(data as Item[]);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  },
+
+  getItems: async (): Promise<Item[]> => {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*')
+      .order('name', { ascending: true });
+    
+    if (error) {
+      console.error('Error fetching items:', error);
+      return [];
     }
-  };
+    return data as Item[];
+  },
 
-  // Calculate total collected from audit logs (all weekly payment records)
-  const calculateAuditLogsTotalCollected = () => {
-    // Create a map to store the most recent record for each member-week combination
-    const memberWeekMap = new Map<string, WeeklyPaymentRecord>();
+  addItem: async (item: Omit<Item, 'id'>) => {
+    const { data, error } = await supabase
+      .from('items')
+      .insert([item])
+      .select();
     
-    weeklyPaymentRecords.forEach(record => {
-      const key = `${record.memberId}-${record.weekNumber}`;
-      const existing = memberWeekMap.get(key);
+    if (error) {
+      console.error('Error adding item:', error);
+      throw error;
+    }
+    return data[0];
+  },
+
+  updateItem: async (id: string, updates: Partial<Item>) => {
+    const { error } = await supabase
+      .from('items')
+      .update(updates)
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error updating item:', error);
+      throw error;
+    }
+  },
+
+  deleteItem: async (id: string) => {
+    const { error } = await supabase
+      .from('items')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting item:', error);
+      throw error;
+    }
+  },
+
+  // Orders
+  subscribeToOrders: (callback: (orders: Order[]) => void) => {
+    const subscription = supabase
+      .channel('orders-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+        },
+        (payload) => {
+          supabase
+            .from('orders')
+            .select('*')
+            .order('orderDate', { ascending: false })
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('Error fetching orders:', error);
+              } else {
+                callback(data as Order[]);
+              }
+            });
+        }
+      )
+      .subscribe();
+
+    // Initial load
+    supabase
+      .from('orders')
+      .select('*')
+      .order('orderDate', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching orders:', error);
+        } else {
+          callback(data as Order[]);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  },
+
+  getOrders: async (): Promise<Order[]> => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .order('orderDate', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching orders:', error);
+      return [];
+    }
+    return data as Order[];
+  },
+
+  addOrder: async (order: Omit<Order, 'id'>) => {
+    const { data, error } = await supabase
+      .from('orders')
+      .insert([order])
+      .select();
+    
+    if (error) {
+      console.error('Error adding order:', error);
+      throw error;
+    }
+    return data[0];
+  },
+
+  updateOrder: async (id: string, updates: Partial<Order>) => {
+    const { error } = await supabase
+      .from('orders')
+      .update(updates)
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error updating order:', error);
+      throw error;
+    }
+  },
+
+  // Gang Fund
+  subscribeToGangFund: (callback: (fund: GangFund | null) => void) => {
+    // For gang fund, we just get the single record with id 'main'
+    supabase
+      .from('gangfund')
+      .select('*')
+      .eq('id', 'main')
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching gang fund:', error);
+          callback(null);
+        } else if (data && data.length > 0) {
+          callback(data[0] as GangFund);
+        } else {
+          callback(null);
+        }
+      });
+
+    // Set up real-time subscription
+    const subscription = supabase
+      .channel('gangfund-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'gangfund',
+          filter: 'id=eq.main'
+        },
+        (payload) => {
+          callback(payload.new as GangFund);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  },
+
+  getGangFund: async (): Promise<GangFund | null> => {
+    const { data, error } = await supabase
+      .from('gangfund')
+      .select('*')
+      .eq('id', 'main')
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') { // Record not found
+        return null;
+      }
+      console.error('Error fetching gang fund:', error);
+      return null;
+    }
+    return data as GangFund;
+  },
+
+  updateGangFund: async (baseAmount: number, updatedBy: string) => {
+    const fundData = {
+      id: 'main',
+      baseAmount,
+      lastUpdated: new Date().toISOString(),
+      updatedBy
+    };
+
+    const { error } = await supabase
+      .from('gangfund')
+      .upsert([fundData]);
+    
+    if (error) {
+      console.error('Error updating gang fund:', error);
+      throw error;
+    }
+  },
+
+  // Audit Logs
+  subscribeToAuditLogs: (callback: (auditLogs: AuditLog[]) => void) => {
+    const subscription = supabase
+      .channel('auditlogs-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'auditlogs',
+        },
+        (payload) => {
+          supabase
+            .from('auditlogs')
+            .select('*')
+            .order('createdAt', { ascending: false })
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('Error fetching audit logs:', error);
+              } else {
+                callback(data as AuditLog[]);
+              }
+            });
+        }
+      )
+      .subscribe();
+
+    // Initial load
+    supabase
+      .from('auditlogs')
+      .select('*')
+      .order('createdAt', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching audit logs:', error);
+        } else {
+          callback(data as AuditLog[]);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  },
+
+  getAuditLogs: async (): Promise<AuditLog[]> => {
+    const { data, error } = await supabase
+      .from('auditlogs')
+      .select('*')
+      .order('createdAt', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching audit logs:', error);
+      return [];
+    }
+    return data as AuditLog[];
+  },
+
+  addAuditLog: async (auditLog: Omit<AuditLog, 'id'>) => {
+    const { data, error } = await supabase
+      .from('auditlogs')
+      .insert([auditLog])
+      .select();
+    
+    if (error) {
+      console.error('Error adding audit log:', error);
+      throw error;
+    }
+    return data[0];
+  },
+
+  updateAuditLog: async (id: string, updates: Partial<AuditLog>) => {
+    const { error } = await supabase
+      .from('auditlogs')
+      .update(updates)
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error updating audit log:', error);
+      throw error;
+    }
+  },
+
+  deleteAuditLog: async (id: string) => {
+    const { error } = await supabase
+      .from('auditlogs')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting audit log:', error);
+      throw error;
+    }
+  },
+
+  // Weekly Payment Records
+  subscribeToWeeklyPaymentRecords: (callback: (records: WeeklyPaymentRecord[]) => void) => {
+    const subscription = supabase
+      .channel('weeklypaymentrecords-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'weeklypaymentrecords',
+        },
+        (payload) => {
+          supabase
+            .from('weeklypaymentrecords')
+            .select('*')
+            .order('weekNumber', { ascending: false })
+            .then(({ data, error }) => {
+              if (error) {
+                console.error('Error fetching weekly payment records:', error);
+              } else {
+                callback(data as WeeklyPaymentRecord[]);
+              }
+            });
+        }
+      )
+      .subscribe();
+
+    // Initial load
+    supabase
+      .from('weeklypaymentrecords')
+      .select('*')
+      .order('weekNumber', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Error fetching weekly payment records:', error);
+        } else {
+          callback(data as WeeklyPaymentRecord[]);
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  },
+
+  getWeeklyPaymentRecords: async (): Promise<WeeklyPaymentRecord[]> => {
+    const { data, error } = await supabase
+      .from('weeklypaymentrecords')
+      .select('*')
+      .order('weekNumber', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching weekly payment records:', error);
+      return [];
+    }
+    return data as WeeklyPaymentRecord[];
+  },
+
+  addWeeklyPaymentRecord: async (record: Omit<WeeklyPaymentRecord, 'id'>) => {
+    const { data, error } = await supabase
+      .from('weeklypaymentrecords')
+      .insert([record])
+      .select();
+    
+    if (error) {
+      console.error('Error adding weekly payment record:', error);
+      throw error;
+    }
+    return data[0];
+  },
+
+  // Find existing weekly payment record for a specific member and week
+  findWeeklyPaymentRecord: async (memberId: string, weekNumber: number): Promise<WeeklyPaymentRecord | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('weeklypaymentrecords')
+        .select('*')
+        .eq('memberId', memberId)
+        .eq('weekNumber', weekNumber)
+        .order('markedAt', { ascending: false })
+        .limit(1);
       
-      // Keep the most recent record (highest markedAt)
-      if (!existing || new Date(record.markedAt) > new Date(existing.markedAt)) {
-        memberWeekMap.set(key, record);
+      if (error) {
+        console.error('Error finding weekly payment record:', error);
+        return null;
       }
-    });
-    
-    // Sum up contributions from paid records
-    let totalCollected = 0;
-    memberWeekMap.forEach(record => {
-      if (record.hasPaid) {
-        totalCollected += record.contribution;
+      
+      return data && data.length > 0 ? data[0] as WeeklyPaymentRecord : null;
+    } catch (error) {
+      console.error('Error finding weekly payment record:', error);
+      return null;
+    }
+  },
+
+  // Create or update weekly payment record (upsert)
+  upsertWeeklyPaymentRecord: async (record: Omit<WeeklyPaymentRecord, 'id'>): Promise<void> => {
+    try {
+      const existingRecord = await supabaseService.findWeeklyPaymentRecord(record.memberId, record.weekNumber);
+      
+      if (existingRecord) {
+        // Update existing record
+        await supabaseService.updateWeeklyPaymentRecord(existingRecord.id, {
+          hasPaid: record.hasPaid,
+          paymentDate: record.paymentDate,
+          markedBy: record.markedBy,
+          markedAt: record.markedAt,
+          contribution: record.contribution // Update contribution too in case it changed
+        });
+        console.log('✅ Updated existing weekly payment record');
+      } else {
+        // Create new record
+        await supabaseService.addWeeklyPaymentRecord(record);
+        console.log('✅ Created new weekly payment record');
       }
-    });
+    } catch (error) {
+      console.error('Error upserting weekly payment record:', error);
+      throw error;
+    }
+  },
+
+  updateWeeklyPaymentRecord: async (id: string, updates: Partial<WeeklyPaymentRecord>) => {
+    const { error } = await supabase
+      .from('weeklypaymentrecords')
+      .update(updates)
+      .eq('id', id);
     
-    return totalCollected;
-  };
+    if (error) {
+      console.error('Error updating weekly payment record:', error);
+      throw error;
+    }
+  },
 
-  const paidMembers = members.filter(m => m.hasPaid);
-  const currentWeekContributions = paidMembers.reduce((sum, member) => sum + member.contribution, 0);
-  const auditLogsTotalCollected = calculateAuditLogsTotalCollected();
-  const baseAmount = gangFund?.baseAmount || 20000;
-  
-  // Add approved orders to collected funds
-  const approvedOrdersTotal = orders
-    .filter(order => order.status === 'approved' || order.status === 'completed')
-    .reduce((sum, order) => sum + order.totalAmount, 0);
-  
-  // Calculate net balance from transactions (Money Moves)
-  const totalSpent = transactions.filter(t => t.type === 'expense').reduce((sum, exp) => sum + exp.amount, 0);
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, inc) => sum + inc.amount, 0);
-  const netTransactionBalance = totalIncome - totalSpent;
-  
-  // Calculate comprehensive total funds using audit logs data
-  const totalFunds = baseAmount + auditLogsTotalCollected + approvedOrdersTotal + netTransactionBalance;
+  deleteWeeklyPaymentRecord: async (id: string) => {
+    const { error } = await supabase
+      .from('weeklypaymentrecords')
+      .delete()
+      .eq('id', id);
+    
+    if (error) {
+      console.error('Error deleting weekly payment record:', error);
+      throw error;
+    }
+  },
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading gang members...</p>
-          {loadError && (
-            <p className="text-destructive mt-2">Error loading data. Please check your Firebase connection.</p>
-          )}
-        </div>
-      </div>
-    );
+  // Initialize default data
+  initializeDefaultItems: async () => {
+    try {
+      // Check if items table is empty
+      const { count, error: countError } = await supabase
+        .from('items')
+        .select('*', { count: 'exact', head: true });
+      
+      if (countError) {
+        console.error('Error checking items count:', countError);
+        return;
+      }
+
+      if (count === 0) {
+        console.log('🎯 Initializing default items...');
+        
+        const defaultItems = [
+          { name: "AK-47", price: 2500, category: "weapon", description: "Classic assault rifle" },
+          { name: "Bulletproof Vest", price: 800, category: "armor", description: "Level IIIA protection" },
+          { name: "Night Vision Goggles", price: 1200, category: "equipment", description: "See in the dark" },
+          { name: "Encrypted Radio", price: 300, category: "communication", description: "Secure comms" },
+          { name: "Smoke Grenades", price: 150, category: "tactical", description: "Pack of 3" }
+        ];
+
+        const { error } = await supabase
+          .from('items')
+          .insert(defaultItems);
+        
+        if (error) {
+          console.error('Error adding default items:', error);
+        } else {
+          console.log('✅ Default items initialized');
+        }
+      }
+
+      // Check if gang fund exists
+      const { data: fundData, error: fundError } = await supabase
+        .from('gangfund')
+        .select('*')
+        .eq('id', 'main')
+        .single();
+      
+      if (fundError && fundError.code === 'PGRST116') { // Record not found
+        console.log('💰 Initializing gang fund...');
+        const fundRecord = {
+          id: 'main',
+          baseAmount: 20000,
+          lastUpdated: new Date().toISOString(),
+          updatedBy: 'system'
+        };
+        
+        const { error } = await supabase
+          .from('gangfund')
+          .insert([fundRecord]);
+        
+        if (error) {
+          console.error('Error initializing gang fund:', error);
+        } else {
+          console.log('✅ Gang fund initialized with $20,000');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error initializing default data:', error);
+    }
   }
-
-  return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="card-gang">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-rajdhani text-muted-foreground">Total Members</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-orbitron font-bold text-gang-glow">
-              {members.length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-gang">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-rajdhani text-muted-foreground">Paid This Week</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-orbitron font-bold text-success">
-              {paidMembers.length}/{members.length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-gang">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-rajdhani text-muted-foreground">
-              <DollarSign className="w-4 h-4 inline mr-1" />
-              Total Gang Funds
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-orbitron font-bold text-gang-neon">
-              ${totalFunds.toLocaleString()}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Base: ${baseAmount.toLocaleString()} + Audit Total: ${auditLogsTotalCollected.toLocaleString()} + Orders: ${approvedOrdersTotal.toLocaleString()} + Net: ${netTransactionBalance.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-gang">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-rajdhani text-muted-foreground">Weekly Reset</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm font-orbitron font-bold text-gang-glow">
-              {lastResetDate ? `Last: ${safeFormatDate(lastResetDate)}` : 'Auto-reset on Sundays'}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {new Date().getDay() === 0 ? '🔄 Reset Day!' : 'Next: Sunday'}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Comprehensive Financial Overview */}
-      <Card className="card-gang">
-        <CardHeader>
-          <CardTitle className="font-orbitron text-gang-glow flex items-center">
-            <DollarSign className="w-5 h-5 mr-2" />
-            💰 Comprehensive Financial Overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Income Sources */}
-            <div className="space-y-3">
-              <h4 className="font-rajdhani font-bold text-success text-lg">💰 Income Sources</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Base Gang Fund</span>
-                  <span className="font-orbitron font-bold text-success">${baseAmount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Audit Logs Total Collected</span>
-                  <span className="font-orbitron font-bold text-success">${auditLogsTotalCollected.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-success/20 rounded">
-                  <span className="text-sm">Current Week Contributions</span>
-                  <span className="font-orbitron font-bold text-success">${currentWeekContributions.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Approved Orders</span>
-                  <span className="font-orbitron font-bold text-success">${approvedOrdersTotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Transaction Income</span>
-                  <span className="font-orbitron font-bold text-success">${totalIncome.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Expenses */}
-            <div className="space-y-3">
-              <h4 className="font-rajdhani font-bold text-destructive text-lg">💸 Expenses</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-2 bg-destructive/10 rounded">
-                  <span className="text-sm">Transaction Expenses</span>
-                  <span className="font-orbitron font-bold text-destructive">${totalSpent.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-muted/20 rounded">
-                  <span className="text-sm">Net Transaction Balance</span>
-                  <span className={`font-orbitron font-bold ${netTransactionBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    ${netTransactionBalance.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Total Summary */}
-          <div className="mt-6 p-4 bg-gang-purple/20 rounded-lg border border-gang-purple/30">
-            <div className="flex justify-between items-center">
-              <span className="font-rajdhani font-bold text-lg text-gang-glow">🎯 Total Gang Funds</span>
-              <span className="text-3xl font-orbitron font-bold text-gang-neon">
-                ${totalFunds.toLocaleString()}
-              </span>
-            </div>
-            <div className="text-sm text-muted-foreground mt-2">
-              Comprehensive balance including base fund, audit logs total collected, approved orders, and net transaction balance
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Gang Fund Management (Admin Only) */}
-      {isAdmin && (
-        <Card className="card-gang">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-gang-glow flex items-center">
-              <Settings className="w-5 h-5 mr-2" />
-              Gang Fund Management 💰
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <label className="text-sm font-rajdhani text-muted-foreground">Base Gang Fund Amount</label>
-                {isEditingFunds ? (
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      type="number"
-                      value={editFundAmount}
-                      onChange={(e) => setEditFundAmount(e.target.value)}
-                      className="bg-input"
-                      placeholder="Enter base amount"
-                    />
-                    <Button onClick={updateGangFund} size="sm" className="btn-gang">
-                      <Save className="w-4 h-4 mr-1" />
-                      Save
-                    </Button>
-                    <Button 
-                      onClick={() => {
-                        setIsEditingFunds(false);
-                        setEditFundAmount(gangFund?.baseAmount.toString() || "20000");
-                      }} 
-                      variant="outline" 
-                      size="sm"
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="text-lg font-orbitron font-bold text-gang-neon">
-                      ${baseAmount.toLocaleString()}
-                    </div>
-                    <Button 
-                      onClick={() => setIsEditingFunds(true)} 
-                      variant="outline" 
-                      size="sm"
-                      className="btn-gang-outline"
-                    >
-                      <Edit className="w-4 h-4 mr-1" />
-                      Edit
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Last updated: {gangFund?.lastUpdated ? new Date(gangFund.lastUpdated).toLocaleString() : 'Never'}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Add New Member (Admin Only) */}
-      {isAdmin && (
-        <Card className="card-gang">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-gang-glow">
-              Add New Gang Member 👥
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-3">
-              <Input
-                placeholder="Enter member name..."
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                className="flex-1 bg-input"
-                onKeyPress={(e) => e.key === 'Enter' && addMember()}
-              />
-              <Button onClick={addMember} className="btn-gang">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Member
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Members List */}
-      <Card className="card-gang">
-        <CardHeader>
-          <CardTitle className="font-orbitron text-gang-glow">
-            Gang Members & Weekly Contributions 💜
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {members && Array.isArray(members) && members.length > 0 ? (
-              [...members]
-                .sort((a, b) => (a.order || 0) - (b.order || 0))
-                .map((member, index) => {
-                  // Additional safety check for each member
-                  if (!member || typeof member !== 'object' || !member.id) {
-                    console.error('❌ Skipping invalid member:', member);
-                    return null;
-                  }
-                  
-                  return (
-                    <SortableMemberItem
-                      key={member.id}
-                      member={member}
-                      index={index}
-                      isAdmin={isAdmin}
-                      editingContribution={editingContribution}
-                      setEditingContribution={setEditingContribution}
-                      updateMemberContribution={updateMemberContribution}
-                      startEditingContribution={startEditingContribution}
-                      togglePayment={togglePayment}
-                      deleteMember={deleteMember}
-                      safeFormatDate={safeFormatDate}
-                      onDragStart={handleDragStart}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      isDragging={draggedMemberId === member.id}
-                    />
-                  );
-                })
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <UserX className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="mb-4">No gang members yet. Time to recruit! 🎯</p>
-                {isAdmin && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gang-glow mb-3">
-                      Quick recruit some members to get started:
-                    </p>
-                    <Button 
-                      onClick={createTestData} 
-                      disabled={creatingTestData}
-                      className="btn-gang"
-                    >
-                      {creatingTestData ? (
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Recruiting...
-                        </div>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Recruit Gang Members 👥
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
 };

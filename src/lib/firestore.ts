@@ -116,160 +116,303 @@ export interface WeeklyPaymentRecord {
 export const firestoreService = {
   // Members
   subscribeToMembers: (callback: (members: Member[]) => void) => {
-    const q = query(collection(db, 'members'), orderBy('order', 'asc'));
-    return onSnapshot(q, (snapshot) => {
-      const members = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Member[];
-      callback(members);
-    });
+    try {
+      const q = query(collection(db, 'members'), orderBy('order', 'asc'));
+      return onSnapshot(q, (snapshot) => {
+        const members = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Member[];
+        callback(members);
+      }, (error) => {
+        console.error('Error subscribing to members:', error);
+        callback([]); // Return empty array on error to stop loading state
+      });
+    } catch (error) {
+      console.error('Error setting up members subscription:', error);
+      callback([]);
+      return () => {}; // Return no-op unsubscribe function
+    }
   },
 
   addMember: async (member: Omit<Member, 'id'>) => {
-    return await addDoc(collection(db, 'members'), member);
+    try {
+      return await addDoc(collection(db, 'members'), member);
+    } catch (error) {
+      console.error('Error adding member:', error);
+      throw error;
+    }
   },
 
   updateMember: async (id: string, updates: Partial<Member>) => {
-    return await updateDoc(doc(db, 'members', id), updates);
+    try {
+      return await updateDoc(doc(db, 'members', id), updates);
+    } catch (error) {
+      console.error('Error updating member:', error);
+      throw error;
+    }
   },
 
   batchUpdateMembers: async (updates: { id: string; updates: Partial<Member> }[]) => {
-    const batch = writeBatch(db);
-    updates.forEach(({ id, updates: memberUpdates }) => {
-      const memberRef = doc(db, 'members', id);
-      batch.update(memberRef, memberUpdates);
-    });
-    return await batch.commit();
+    try {
+      const batch = writeBatch(db);
+      updates.forEach(({ id, updates: memberUpdates }) => {
+        const memberRef = doc(db, 'members', id);
+        batch.update(memberRef, memberUpdates);
+      });
+      return await batch.commit();
+    } catch (error) {
+      console.error('Error batch updating members:', error);
+      throw error;
+    }
   },
 
   deleteMember: async (id: string) => {
-    return await deleteDoc(doc(db, 'members', id));
+    try {
+      return await deleteDoc(doc(db, 'members', id));
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      throw error;
+    }
   },
 
   // Transactions
   subscribeToTransactions: (callback: (transactions: Transaction[]) => void) => {
-    const q = query(collection(db, 'transactions'), orderBy('date', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      const transactions = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Transaction[];
-      callback(transactions);
-    });
+    try {
+      const q = query(collection(db, 'transactions'), orderBy('date', 'desc'));
+      return onSnapshot(q, (snapshot) => {
+        const transactions = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Transaction[];
+        callback(transactions);
+      }, (error) => {
+        console.error('Error subscribing to transactions:', error);
+        callback([]); // Return empty array on error to stop loading state
+      });
+    } catch (error) {
+      console.error('Error setting up transactions subscription:', error);
+      callback([]);
+      return () => {};
+    }
   },
 
   addTransaction: async (transaction: Omit<Transaction, 'id'>) => {
-    return await addDoc(collection(db, 'transactions'), transaction);
+    try {
+      return await addDoc(collection(db, 'transactions'), transaction);
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+      throw error;
+    }
   },
 
   deleteTransaction: async (id: string) => {
-    return await deleteDoc(doc(db, 'transactions', id));
+    try {
+      return await deleteDoc(doc(db, 'transactions', id));
+    } catch (error) {
+      console.error('Error deleting transaction:', error);
+      throw error;
+    }
   },
 
   // Items
   subscribeToItems: (callback: (items: Item[]) => void) => {
-    const q = query(collection(db, 'items'), orderBy('name'));
-    return onSnapshot(q, (snapshot) => {
-      const items = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Item[];
-      callback(items);
-    });
+    try {
+      const q = query(collection(db, 'items'), orderBy('name'));
+      return onSnapshot(q, (snapshot) => {
+        const items = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Item[];
+        callback(items);
+      }, (error) => {
+        console.error('Error subscribing to items:', error);
+        callback([]); // Return empty array on error to stop loading state
+      });
+    } catch (error) {
+      console.error('Error setting up items subscription:', error);
+      callback([]);
+      return () => {};
+    }
   },
 
   addItem: async (item: Omit<Item, 'id'>) => {
-    return await addDoc(collection(db, 'items'), item);
+    try {
+      return await addDoc(collection(db, 'items'), item);
+    } catch (error) {
+      console.error('Error adding item:', error);
+      throw error;
+    }
   },
 
   updateItem: async (id: string, updates: Partial<Item>) => {
-    return await updateDoc(doc(db, 'items', id), updates);
+    try {
+      return await updateDoc(doc(db, 'items', id), updates);
+    } catch (error) {
+      console.error('Error updating item:', error);
+      throw error;
+    }
   },
 
   deleteItem: async (id: string) => {
-    return await deleteDoc(doc(db, 'items', id));
+    try {
+      return await deleteDoc(doc(db, 'items', id));
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      throw error;
+    }
   },
 
   // Orders
   subscribeToOrders: (callback: (orders: Order[]) => void) => {
-    const q = query(collection(db, 'orders'), orderBy('orderDate', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      const orders = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Order[];
-      callback(orders);
-    });
+    try {
+      const q = query(collection(db, 'orders'), orderBy('orderDate', 'desc'));
+      return onSnapshot(q, (snapshot) => {
+        const orders = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Order[];
+        callback(orders);
+      }, (error) => {
+        console.error('Error subscribing to orders:', error);
+        callback([]); // Return empty array on error to stop loading state
+      });
+    } catch (error) {
+      console.error('Error setting up orders subscription:', error);
+      callback([]);
+      return () => {};
+    }
   },
 
   addOrder: async (order: Omit<Order, 'id'>) => {
-    return await addDoc(collection(db, 'orders'), order);
+    try {
+      return await addDoc(collection(db, 'orders'), order);
+    } catch (error) {
+      console.error('Error adding order:', error);
+      throw error;
+    }
   },
 
   updateOrder: async (id: string, updates: Partial<Order>) => {
-    return await updateDoc(doc(db, 'orders', id), updates);
+    try {
+      return await updateDoc(doc(db, 'orders', id), updates);
+    } catch (error) {
+      console.error('Error updating order:', error);
+      throw error;
+    }
   },
 
   // Gang Fund
   subscribeToGangFund: (callback: (fund: GangFund | null) => void) => {
-    return onSnapshot(doc(db, 'gangfund', 'main'), (snapshot) => {
-      if (snapshot.exists()) {
-        const fund = { id: snapshot.id, ...snapshot.data() } as GangFund;
-        callback(fund);
-      } else {
-        callback(null);
-      }
-    });
+    try {
+      return onSnapshot(doc(db, 'gangfund', 'main'), (snapshot) => {
+        if (snapshot.exists()) {
+          const fund = { id: snapshot.id, ...snapshot.data() } as GangFund;
+          callback(fund);
+        } else {
+          callback(null);
+        }
+      }, (error) => {
+        console.error('Error subscribing to gang fund:', error);
+        callback(null); // Return null on error to stop loading state
+      });
+    } catch (error) {
+      console.error('Error setting up gang fund subscription:', error);
+      callback(null);
+      return () => {};
+    }
   },
 
   updateGangFund: async (baseAmount: number, updatedBy: string) => {
-    const fundData = {
-      baseAmount,
-      lastUpdated: new Date().toISOString(),
-      updatedBy
-    };
-    return await setDoc(doc(db, 'gangfund', 'main'), fundData);
+    try {
+      const fundData = {
+        baseAmount,
+        lastUpdated: new Date().toISOString(),
+        updatedBy
+      };
+      return await setDoc(doc(db, 'gangfund', 'main'), fundData);
+    } catch (error) {
+      console.error('Error updating gang fund:', error);
+      throw error;
+    }
   },
 
   // Audit Logs
   subscribeToAuditLogs: (callback: (auditLogs: AuditLog[]) => void) => {
-    const q = query(collection(db, 'auditLogs'), orderBy('createdAt', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      const auditLogs = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as AuditLog[];
-      callback(auditLogs);
-    });
+    try {
+      const q = query(collection(db, 'auditLogs'), orderBy('createdAt', 'desc'));
+      return onSnapshot(q, (snapshot) => {
+        const auditLogs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as AuditLog[];
+        callback(auditLogs);
+      }, (error) => {
+        console.error('Error subscribing to audit logs:', error);
+        callback([]); // Return empty array on error to stop loading state
+      });
+    } catch (error) {
+      console.error('Error setting up audit logs subscription:', error);
+      callback([]);
+      return () => {};
+    }
   },
 
   addAuditLog: async (auditLog: Omit<AuditLog, 'id'>) => {
-    return await addDoc(collection(db, 'auditLogs'), auditLog);
+    try {
+      return await addDoc(collection(db, 'auditLogs'), auditLog);
+    } catch (error) {
+      console.error('Error adding audit log:', error);
+      throw error;
+    }
   },
 
   updateAuditLog: async (id: string, updates: Partial<AuditLog>) => {
-    return await updateDoc(doc(db, 'auditLogs', id), updates);
+    try {
+      return await updateDoc(doc(db, 'auditLogs', id), updates);
+    } catch (error) {
+      console.error('Error updating audit log:', error);
+      throw error;
+    }
   },
 
   deleteAuditLog: async (id: string) => {
-    return await deleteDoc(doc(db, 'auditLogs', id));
+    try {
+      return await deleteDoc(doc(db, 'auditLogs', id));
+    } catch (error) {
+      console.error('Error deleting audit log:', error);
+      throw error;
+    }
   },
 
   // Weekly Payment Records
   subscribeToWeeklyPaymentRecords: (callback: (records: WeeklyPaymentRecord[]) => void) => {
-    const q = query(collection(db, 'weeklyPaymentRecords'), orderBy('weekNumber', 'desc'), orderBy('markedAt', 'desc'));
-    return onSnapshot(q, (snapshot) => {
-      const records = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as WeeklyPaymentRecord[];
-      callback(records);
-    });
+    try {
+      const q = query(collection(db, 'weeklyPaymentRecords'), orderBy('weekNumber', 'desc'), orderBy('markedAt', 'desc'));
+      return onSnapshot(q, (snapshot) => {
+        const records = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as WeeklyPaymentRecord[];
+        callback(records);
+      }, (error) => {
+        console.error('Error subscribing to weekly payment records:', error);
+        callback([]); // Return empty array on error to stop loading state
+      });
+    } catch (error) {
+      console.error('Error setting up weekly payment records subscription:', error);
+      callback([]);
+      return () => {};
+    }
   },
 
   addWeeklyPaymentRecord: async (record: Omit<WeeklyPaymentRecord, 'id'>) => {
-    return await addDoc(collection(db, 'weeklyPaymentRecords'), record);
+    try {
+      return await addDoc(collection(db, 'weeklyPaymentRecords'), record);
+    } catch (error) {
+      console.error('Error adding weekly payment record:', error);
+      throw error;
+    }
   },
 
   // Find existing weekly payment record for a specific member and week
@@ -324,20 +467,35 @@ export const firestoreService = {
   },
 
   updateWeeklyPaymentRecord: async (id: string, updates: Partial<WeeklyPaymentRecord>) => {
-    return await updateDoc(doc(db, 'weeklyPaymentRecords', id), updates);
+    try {
+      return await updateDoc(doc(db, 'weeklyPaymentRecords', id), updates);
+    } catch (error) {
+      console.error('Error updating weekly payment record:', error);
+      throw error;
+    }
   },
 
   deleteWeeklyPaymentRecord: async (id: string) => {
-    return await deleteDoc(doc(db, 'weeklyPaymentRecords', id));
+    try {
+      return await deleteDoc(doc(db, 'weeklyPaymentRecords', id));
+    } catch (error) {
+      console.error('Error deleting weekly payment record:', error);
+      throw error;
+    }
   },
 
   batchUpdateWeeklyPaymentRecords: async (updates: { id: string; updates: Partial<WeeklyPaymentRecord> }[]) => {
-    const batch = writeBatch(db);
-    updates.forEach(({ id, updates: recordUpdates }) => {
-      const recordRef = doc(db, 'weeklyPaymentRecords', id);
-      batch.update(recordRef, recordUpdates);
-    });
-    return await batch.commit();
+    try {
+      const batch = writeBatch(db);
+      updates.forEach(({ id, updates: recordUpdates }) => {
+        const recordRef = doc(db, 'weeklyPaymentRecords', id);
+        batch.update(recordRef, recordUpdates);
+      });
+      return await batch.commit();
+    } catch (error) {
+      console.error('Error batch updating weekly payment records:', error);
+      throw error;
+    }
   },
 
   // Initialize default data

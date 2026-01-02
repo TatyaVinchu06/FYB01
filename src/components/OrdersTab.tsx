@@ -137,32 +137,69 @@ export const OrdersTab = (props: OrdersTabProps) => {
     quantity: 1
   });
 
-  // Subscribe to real-time updates
+  // Fetch data from Supabase
   useEffect(() => {
+    let isCancelled = false;
+    
+    const fetchData = async () => {
+      try {
+        const [itemsData, ordersData] = await Promise.all([
+          firestoreService.getItems(),
+          firestoreService.getOrders()
+        ]);
+        
+        if (!isCancelled) {
+          setAvailableItems(itemsData);
+          setOrders(ordersData);
+          
+          if (itemsData.length > 0 && !newOrder.selectedItemId) {
+            setNewOrder(prev => ({ ...prev, selectedItemId: itemsData[0].id }));
+          }
+          
+          setLoading(false);
+          setLoadError(false); // Clear error when data loads
+          clearTimeout(timeoutId); // Clear timeout when data is received
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        if (!isCancelled) {
+          setLoading(false);
+          setLoadError(true);
+        }
+      }
+    };
+    
     // Set a timeout to stop loading state if data doesn't load within 10 seconds
     const timeoutId = setTimeout(() => {
       setLoading(false);
       setLoadError(true);
     }, 10000);
     
+    fetchData();
+    
+    // Set up real-time subscriptions if supported
     const unsubscribeItems = firestoreService.subscribeToItems((newItems) => {
-      setAvailableItems(newItems);
-      if (newItems.length > 0 && !newOrder.selectedItemId) {
-        setNewOrder(prev => ({ ...prev, selectedItemId: newItems[0].id }));
+      if (!isCancelled) {
+        setAvailableItems(newItems);
+        if (newItems.length > 0 && !newOrder.selectedItemId) {
+          setNewOrder(prev => ({ ...prev, selectedItemId: newItems[0].id }));
+        }
       }
     });
 
     const unsubscribeOrders = firestoreService.subscribeToOrders((newOrders) => {
-      setOrders(newOrders);
-      setLoading(false);
-      setLoadError(false); // Clear error when data loads
-      clearTimeout(timeoutId); // Clear timeout when data is received
+      if (!isCancelled) {
+        setOrders(newOrders);
+      }
     });
 
     // Initialize default items if none exist
-    firestoreService.initializeDefaultItems();
+    if (!isCancelled) {
+      firestoreService.initializeDefaultItems();
+    }
 
     return () => {
+      isCancelled = true;
       clearTimeout(timeoutId);
       unsubscribeItems();
       unsubscribeOrders();

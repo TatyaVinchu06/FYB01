@@ -14,6 +14,7 @@ interface ExpendituresTabProps {
 export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [newTransaction, setNewTransaction] = useState({
     description: "",
     amount: "",
@@ -23,12 +24,23 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
 
   // Subscribe to real-time updates
   useEffect(() => {
+    // Set a timeout to stop loading state if data doesn't load within 10 seconds
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setLoadError(true);
+    }, 10000);
+    
     const unsubscribe = firestoreService.subscribeToTransactions((newTransactions) => {
       setTransactions(newTransactions);
       setLoading(false);
+      setLoadError(false); // Clear error when data loads
+      clearTimeout(timeoutId); // Clear timeout when data is received
     });
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      unsubscribe();
+    };
   }, []);
 
   const addTransaction = async () => {
@@ -91,6 +103,9 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading transactions...</p>
+          {loadError && (
+            <p className="text-destructive mt-2">Error loading data. Please check your Firebase connection.</p>
+          )}
         </div>
       </div>
     );
@@ -176,7 +191,7 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
               />
               <select
                 value={newTransaction.type}
-                onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value})}
+                onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value as Transaction['type']})}
                 className="px-3 py-2 bg-input border border-border rounded-md text-foreground"
               >
                 <option value="expense">💸 Expense</option>

@@ -121,6 +121,7 @@ export const OrdersTab = (props: OrdersTabProps) => {
   const [availableItems, setAvailableItems] = useState<Item[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   
   const [newItem, setNewItem] = useState({
     name: "",
@@ -138,6 +139,12 @@ export const OrdersTab = (props: OrdersTabProps) => {
 
   // Subscribe to real-time updates
   useEffect(() => {
+    // Set a timeout to stop loading state if data doesn't load within 10 seconds
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setLoadError(true);
+    }, 10000);
+    
     const unsubscribeItems = firestoreService.subscribeToItems((newItems) => {
       setAvailableItems(newItems);
       if (newItems.length > 0 && !newOrder.selectedItemId) {
@@ -148,12 +155,15 @@ export const OrdersTab = (props: OrdersTabProps) => {
     const unsubscribeOrders = firestoreService.subscribeToOrders((newOrders) => {
       setOrders(newOrders);
       setLoading(false);
+      setLoadError(false); // Clear error when data loads
+      clearTimeout(timeoutId); // Clear timeout when data is received
     });
 
     // Initialize default items if none exist
     firestoreService.initializeDefaultItems();
 
     return () => {
+      clearTimeout(timeoutId);
       unsubscribeItems();
       unsubscribeOrders();
     };
@@ -251,6 +261,9 @@ export const OrdersTab = (props: OrdersTabProps) => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading orders and items...</p>
+          {loadError && (
+            <p className="text-destructive mt-2">Error loading data. Please check your Firebase connection.</p>
+          )}
         </div>
       </div>
     );
@@ -511,7 +524,7 @@ export const OrdersTab = (props: OrdersTabProps) => {
                     {order.status === "approved" && (
                       <Button
                         size="sm"
-                        variant="success"
+                        variant="default"
                         onClick={() => updateOrderStatus(order.id, "completed")}
                       >
                         Complete

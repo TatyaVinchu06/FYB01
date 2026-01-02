@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,23 +36,14 @@ import {
 } from "@radix-ui/react-icons";
 import { supabaseService as firestoreService, Transaction, Member, GangFund, Order, WeeklyPaymentRecord } from "@/lib/supabaseService";
 
-// Define the type for the props
 interface MembersTabProps {
   isAdmin: boolean;
 }
 
-export function MembersTab({
-  members,
-  setMembers,
-  transactions,
-  setTransactions,
-  gangFund,
-  setGangFund,
-  orders,
-  setOrders,
-  weeklyPaymentRecords,
-  setWeeklyPaymentRecords
-}: MembersTabProps) {
+export function MembersTab({ isAdmin }: MembersTabProps) {
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [newMemberContribution, setNewMemberContribution] = useState(100);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -60,6 +51,43 @@ export function MembersTab({
   const [editContribution, setEditContribution] = useState(100);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // Fetch members from Supabase
+  useEffect(() => {
+    let isCancelled = false;
+    
+    const fetchMembers = async () => {
+      try {
+        const membersData = await firestoreService.getMembers();
+        
+        if (!isCancelled) {
+          setMembers(membersData);
+          setLoading(false);
+          setLoadError(false); // Clear error when data loads
+        }
+      } catch (error) {
+        console.error('Error fetching members:', error);
+        if (!isCancelled) {
+          setLoading(false);
+          setLoadError(true);
+        }
+      }
+    };
+    
+    fetchMembers();
+    
+    // Set up real-time subscription if supported
+    const unsubscribe = firestoreService.subscribeToMembers((newMembers) => {
+      if (!isCancelled) {
+        setMembers(newMembers);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+      unsubscribe();
+    };
+  }, []);
 
   // Calculate total members and total paid
   const totalMembers = members.length;
@@ -192,6 +220,20 @@ export function MembersTab({
     setIsEditDialogOpen(true);
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading members...</p>
+          {loadError && (
+            <p className="text-destructive mt-2">Error loading data. Please check your Supabase connection.</p>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -201,43 +243,45 @@ export function MembersTab({
             Manage your gang members and their payment status
           </p>
         </div>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button>
-              <PlusIcon className="mr-2 h-4 w-4" />
-              Add Member
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add New Member</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="memberName">Member Name</Label>
-                <Input
-                  id="memberName"
-                  value={newMemberName}
-                  onChange={(e) => setNewMemberName(e.target.value)}
-                  placeholder="Enter member name"
-                />
+        {isAdmin && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <PlusIcon className="mr-2 h-4 w-4" />
+                Add Member
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Member</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="memberName">Member Name</Label>
+                  <Input
+                    id="memberName"
+                    value={newMemberName}
+                    onChange={(e) => setNewMemberName(e.target.value)}
+                    placeholder="Enter member name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="contribution">Weekly Contribution ($)</Label>
+                  <Input
+                    id="contribution"
+                    type="number"
+                    value={newMemberContribution}
+                    onChange={(e) => setNewMemberContribution(Number(e.target.value))}
+                    placeholder="Enter contribution amount"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="contribution">Weekly Contribution ($)</Label>
-                <Input
-                  id="contribution"
-                  type="number"
-                  value={newMemberContribution}
-                  onChange={(e) => setNewMemberContribution(Number(e.target.value))}
-                  placeholder="Enter contribution amount"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleAddMember}>Add Member</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button onClick={handleAddMember}>Add Member</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Stats Cards */}
@@ -294,55 +338,61 @@ export function MembersTab({
                     >
                       {member.hasPaid ? "Paid" : "Unpaid"}
                     </Badge>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handlePaymentStatusChange(member.id, !member.hasPaid)}
-                    >
-                      {member.hasPaid ? "Mark Unpaid" : "Mark Paid"}
-                    </Button>
+                    {isAdmin && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePaymentStatusChange(member.id, !member.hasPaid)}
+                      >
+                        {member.hasPaid ? "Mark Unpaid" : "Mark Paid"}
+                      </Button>
+                    )}
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-1">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => moveMemberUp(index)}
-                    disabled={index === 0}
-                  >
-                    <ChevronUpIcon className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => moveMemberDown(index)}
-                    disabled={index === members.length - 1}
-                  >
-                    <ChevronDownIcon className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm">
-                      <DotsVerticalIcon className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => openEditDialog(member)}>
-                      <Pencil1Icon className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleDeleteMember(member.id, member.name)}
-                      className="text-destructive"
+                {isAdmin && (
+                  <div className="flex items-center space-x-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => moveMemberUp(index)}
+                      disabled={index === 0}
                     >
-                      <TrashIcon className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <ChevronUpIcon className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => moveMemberDown(index)}
+                      disabled={index === members.length - 1}
+                    >
+                      <ChevronDownIcon className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+                
+                {isAdmin && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm">
+                        <DotsVerticalIcon className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => openEditDialog(member)}>
+                        <Pencil1Icon className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDeleteMember(member.id, member.name)}
+                        className="text-destructive"
+                      >
+                        <TrashIcon className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
             </div>
             

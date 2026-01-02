@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FileText, Calendar, CheckCircle, XCircle, Clock, DollarSign } from "lucide-react";
-import { firestoreService, Member, Order, WeeklyPaymentRecord } from "@/lib/firestore";
+import { supabaseService as firestoreService, Member, Order, WeeklyPaymentRecord } from "@/lib/supabaseService";
 
 interface AuditLogsTabProps {
   isAdmin: boolean;

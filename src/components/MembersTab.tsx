@@ -175,6 +175,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [weeklyPaymentRecords, setWeeklyPaymentRecords] = useState<WeeklyPaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [newMemberName, setNewMemberName] = useState("");
   const [gangFund, setGangFund] = useState<GangFund | null>(null);
   const [isEditingFunds, setIsEditingFunds] = useState(false);
@@ -234,8 +235,18 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
 
   // Subscribe to real-time updates
   useEffect(() => {
+    // Set a timeout to stop loading state if data doesn't load within 10 seconds
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setLoadError(true);
+    }, 10000);
+    
     const unsubscribeMembers = firestoreService.subscribeToMembers((newMembers) => {
       console.log('📥 Received members data:', newMembers);
+      
+      // Clear timeout and hide error when data is received
+      clearTimeout(timeoutId);
+      setLoadError(false);
       
       // Validate that we have an array
       if (!Array.isArray(newMembers)) {
@@ -280,6 +291,7 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
     });
 
     return () => {
+      clearTimeout(timeoutId);
       unsubscribeMembers();
       unsubscribeOrders();
       unsubscribeTransactions();
@@ -560,6 +572,9 @@ export const MembersTab = ({ isAdmin }: MembersTabProps) => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading gang members...</p>
+          {loadError && (
+            <p className="text-destructive mt-2">Error loading data. Please check your Firebase connection.</p>
+          )}
         </div>
       </div>
     );

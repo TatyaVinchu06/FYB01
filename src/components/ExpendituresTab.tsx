@@ -22,22 +22,46 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
     category: "operation"
   });
 
-  // Subscribe to real-time updates
+  // Fetch data from Supabase
   useEffect(() => {
+    let isCancelled = false;
+    
+    const fetchData = async () => {
+      try {
+        const transactionsData = await firestoreService.getTransactions();
+        
+        if (!isCancelled) {
+          setTransactions(transactionsData);
+          setLoading(false);
+          setLoadError(false); // Clear error when data loads
+          clearTimeout(timeoutId); // Clear timeout when data is received
+        }
+      } catch (error) {
+        console.error('Error fetching transactions:', error);
+        if (!isCancelled) {
+          setLoading(false);
+          setLoadError(true);
+        }
+      }
+    };
+    
     // Set a timeout to stop loading state if data doesn't load within 10 seconds
     const timeoutId = setTimeout(() => {
       setLoading(false);
       setLoadError(true);
     }, 10000);
     
+    fetchData();
+    
+    // Set up real-time subscription if supported
     const unsubscribe = firestoreService.subscribeToTransactions((newTransactions) => {
-      setTransactions(newTransactions);
-      setLoading(false);
-      setLoadError(false); // Clear error when data loads
-      clearTimeout(timeoutId); // Clear timeout when data is received
+      if (!isCancelled) {
+        setTransactions(newTransactions);
+      }
     });
 
     return () => {
+      isCancelled = true;
       clearTimeout(timeoutId);
       unsubscribe();
     };

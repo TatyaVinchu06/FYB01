@@ -50,7 +50,7 @@ interface MembersTabProps {
   setWeeklyPaymentRecords: (records: WeeklyPaymentRecord[]) => void;
 }
 
-export default function MembersTab({
+export function MembersTab({
   members,
   setMembers,
   transactions,

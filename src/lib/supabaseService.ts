@@ -1,36 +1,4 @@
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Supabase configuration is incomplete. Please check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-  console.error('Missing required config values:', {
-    supabaseUrl: !!supabaseUrl,
-    supabaseKey: !!supabaseKey
-  });
-}
-
-// Create Supabase client with conditional initialization to avoid build issues
-let supabase: any = null;
-
-if (supabaseUrl && supabaseKey) {
-  try {
-    // Dynamically import during runtime to avoid build issues
-    const initializeSupabase = async () => {
-      const { createClient } = await import('@supabase/supabase-js');
-      return createClient(supabaseUrl!, supabaseKey!);
-    };
-    
-    // Initialize client
-    initializeSupabase().then(client => {
-      supabase = client;
-    }).catch(error => {
-      console.error('Error initializing Supabase client:', error);
-    });
-  } catch (error) {
-    console.error('Error setting up Supabase client:', error);
-  }
-}
+import { supabase } from './supabaseClient';
 
 // Types
 export interface Member {

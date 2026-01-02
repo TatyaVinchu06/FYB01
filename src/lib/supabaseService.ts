@@ -1,15 +1,25 @@
- import { createClient } from '@supabase/supabase-js';
+ // Using dynamic import to avoid build issues with Supabase
+let supabaseClient: any = null;
 
-// Define SupabaseClient type locally to avoid build issues
-interface SupabaseClient {
-  from: (table: string) => any;
-  channel: (name: string) => any;
-  removeChannel: (channel: any) => void;
+// Initialize Supabase client
+const supabaseUrl = import.meta.env.https://wyrtszihluajwpnqymfr.supabase.co;
+const supabaseKey = import.meta.env.sb_publishable_L99RXV12szdWfHrKxbYjUA_L_KKgUZz;
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Supabase configuration is incomplete. Please check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+} else {
+  // Dynamically import and create client
+  import('@supabase/supabase-js').then(module => {
+    const { createClient } = module;
+    supabaseClient = createClient(supabaseUrl!, supabaseKey!);
+  }).catch(error => {
+    console.error('Failed to initialize Supabase client:', error);
+  });
 }
 
 // Initialize Supabase client
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.https://wyrtszihluajwpnqymfr.supabase.co;
+const supabaseKey = import.meta.env.sb_publishable_L99RXV12szdWfHrKxbYjUA_L_KKgUZz;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('Supabase configuration is incomplete. Please check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');

@@ -38,16 +38,7 @@ import { supabaseService as firestoreService, Transaction, Member, GangFund, Ord
 
 // Define the type for the props
 interface MembersTabProps {
-  members: Member[];
-  setMembers: (members: Member[]) => void;
-  transactions: Transaction[];
-  setTransactions: (transactions: Transaction[]) => void;
-  gangFund: GangFund | null;
-  setGangFund: (fund: GangFund) => void;
-  orders: Order[];
-  setOrders: (orders: Order[]) => void;
-  weeklyPaymentRecords: WeeklyPaymentRecord[];
-  setWeeklyPaymentRecords: (records: WeeklyPaymentRecord[]) => void;
+  isAdmin: boolean;
 }
 
 export function MembersTab({

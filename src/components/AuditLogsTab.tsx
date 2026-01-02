@@ -31,12 +31,19 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const [weeklyPaymentRecords, setWeeklyPaymentRecords] = useState<WeeklyPaymentRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<WeeklyAuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [markingPayment, setMarkingPayment] = useState<string | null>(null);
   const [weeksToShow, setWeeksToShow] = useState(12); // Start with 3 months
   const [loadingMore, setLoadingMore] = useState(false);
 
   // Subscribe to real-time updates
   useEffect(() => {
+    // Set a timeout to stop loading state if data doesn't load within 10 seconds
+    const timeoutId = setTimeout(() => {
+      setLoading(false);
+      setLoadError(true);
+    }, 10000);
+    
     const unsubscribeMembers = firestoreService.subscribeToMembers((newMembers) => {
       setMembers(newMembers);
     });
@@ -48,9 +55,14 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
     const unsubscribePaymentRecords = firestoreService.subscribeToWeeklyPaymentRecords((newRecords) => {
       console.log('📊 Weekly payment records updated:', newRecords.length);
       setWeeklyPaymentRecords(newRecords);
+      // Clear loading state when we get the first set of data
+      setLoading(false);
+      setLoadError(false); // Clear error when data loads
+      clearTimeout(timeoutId); // Clear timeout when data is received
     });
 
     return () => {
+      clearTimeout(timeoutId);
       unsubscribeMembers();
       unsubscribeOrders();
       unsubscribePaymentRecords();
@@ -61,7 +73,6 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   useEffect(() => {
     if (members.length > 0) {
       generateAuditLogs();
-      setLoading(false);
     }
   }, [members, orders, weeklyPaymentRecords, weeksToShow]);
 
@@ -342,6 +353,9 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading audit logs...</p>
+          {loadError && (
+            <p className="text-destructive mt-2">Error loading data. Please check your Firebase connection.</p>
+          )}
         </div>
       </div>
     );

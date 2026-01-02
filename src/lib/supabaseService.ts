@@ -1,4 +1,11 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+ import { createClient } from '@supabase/supabase-js';
+
+// Define SupabaseClient type locally to avoid build issues
+interface SupabaseClient {
+  from: (table: string) => any;
+  channel: (name: string) => any;
+  removeChannel: (channel: any) => void;
+}
 
 // Initialize Supabase client
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -8,7 +15,7 @@ if (!supabaseUrl || !supabaseKey) {
   console.error('Supabase configuration is incomplete. Please check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
 }
 
-const supabase: SupabaseClient = createClient(supabaseUrl!, supabaseKey!);
+const supabase = createClient(supabaseUrl!, supabaseKey!);
 
 // Types
 export interface Member {

@@ -36,32 +36,69 @@ export const AuditLogsTab = ({ isAdmin }: AuditLogsTabProps) => {
   const [weeksToShow, setWeeksToShow] = useState(12); // Start with 3 months
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Subscribe to real-time updates
+  // Fetch data from Supabase
   useEffect(() => {
+    let isCancelled = false;
+    
+    const fetchData = async () => {
+      try {
+        const [membersData, ordersData, paymentRecordsData] = await Promise.all([
+          firestoreService.getMembers(),
+          firestoreService.getOrders(),
+          firestoreService.getWeeklyPaymentRecords()
+        ]);
+        
+        if (!isCancelled) {
+          setMembers(membersData);
+          setOrders(ordersData);
+          setWeeklyPaymentRecords(paymentRecordsData);
+          
+          console.log('📊 Weekly payment records updated:', paymentRecordsData.length);
+          
+          // Clear loading state when we get the first set of data
+          setLoading(false);
+          setLoadError(false); // Clear error when data loads
+          clearTimeout(timeoutId); // Clear timeout when data is received
+        }
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        if (!isCancelled) {
+          setLoading(false);
+          setLoadError(true);
+        }
+      }
+    };
+    
     // Set a timeout to stop loading state if data doesn't load within 10 seconds
     const timeoutId = setTimeout(() => {
       setLoading(false);
       setLoadError(true);
     }, 10000);
     
+    fetchData();
+    
+    // Set up real-time subscriptions if supported
     const unsubscribeMembers = firestoreService.subscribeToMembers((newMembers) => {
-      setMembers(newMembers);
+      if (!isCancelled) {
+        setMembers(newMembers);
+      }
     });
 
     const unsubscribeOrders = firestoreService.subscribeToOrders((newOrders) => {
-      setOrders(newOrders);
+      if (!isCancelled) {
+        setOrders(newOrders);
+      }
     });
 
     const unsubscribePaymentRecords = firestoreService.subscribeToWeeklyPaymentRecords((newRecords) => {
-      console.log('📊 Weekly payment records updated:', newRecords.length);
-      setWeeklyPaymentRecords(newRecords);
-      // Clear loading state when we get the first set of data
-      setLoading(false);
-      setLoadError(false); // Clear error when data loads
-      clearTimeout(timeoutId); // Clear timeout when data is received
+      if (!isCancelled) {
+        setWeeklyPaymentRecords(newRecords);
+        console.log('📊 Weekly payment records updated:', newRecords.length);
+      }
     });
 
     return () => {
+      isCancelled = true;
       clearTimeout(timeoutId);
       unsubscribeMembers();
       unsubscribeOrders();

@@ -187,6 +187,23 @@ export const supabaseService = {
     }
   },
 
+  batchUpdateMembers: async (updates: { id: string; updates: Partial<Member> }[]) => {
+    // Process updates one by one since Supabase doesn't have a direct batch update
+    const promises = updates.map(({ id, updates: memberUpdates }) => 
+      supabase
+        .from('members')
+        .update(memberUpdates)
+        .eq('id', id)
+    );
+    
+    try {
+      await Promise.all(promises);
+    } catch (error) {
+      console.error('Error batch updating members:', error);
+      throw error;
+    }
+  },
+
   // Transactions
   subscribeToTransactions: (callback: (transactions: Transaction[]) => void) => {
     const subscription = supabase

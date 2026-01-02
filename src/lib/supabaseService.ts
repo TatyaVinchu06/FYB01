@@ -1,31 +1,36 @@
- // Using dynamic import to avoid build issues with Supabase
-let supabaseClient: any = null;
-
 // Initialize Supabase client
-const supabaseUrl = import.meta.env.https://wyrtszihluajwpnqymfr.supabase.co;
-const supabaseKey = import.meta.env.sb_publishable_L99RXV12szdWfHrKxbYjUA_L_KKgUZz;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error('Supabase configuration is incomplete. Please check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
-} else {
-  // Dynamically import and create client
-  import('@supabase/supabase-js').then(module => {
-    const { createClient } = module;
-    supabaseClient = createClient(supabaseUrl!, supabaseKey!);
-  }).catch(error => {
-    console.error('Failed to initialize Supabase client:', error);
+  console.error('Missing required config values:', {
+    supabaseUrl: !!supabaseUrl,
+    supabaseKey: !!supabaseKey
   });
 }
 
-// Initialize Supabase client
-const supabaseUrl = import.meta.env.https://wyrtszihluajwpnqymfr.supabase.co;
-const supabaseKey = import.meta.env.sb_publishable_L99RXV12szdWfHrKxbYjUA_L_KKgUZz;
+// Create Supabase client with conditional initialization to avoid build issues
+let supabase: any = null;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Supabase configuration is incomplete. Please check your .env file for VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY');
+if (supabaseUrl && supabaseKey) {
+  try {
+    // Dynamically import during runtime to avoid build issues
+    const initializeSupabase = async () => {
+      const { createClient } = await import('@supabase/supabase-js');
+      return createClient(supabaseUrl!, supabaseKey!);
+    };
+    
+    // Initialize client
+    initializeSupabase().then(client => {
+      supabase = client;
+    }).catch(error => {
+      console.error('Error initializing Supabase client:', error);
+    });
+  } catch (error) {
+    console.error('Error setting up Supabase client:', error);
+  }
 }
-
-const supabase = createClient(supabaseUrl!, supabaseKey!);
 
 // Types
 export interface Member {
@@ -108,6 +113,11 @@ export interface WeeklyPaymentRecord {
 export const supabaseService = {
   // Members
   subscribeToMembers: (callback: (members: Member[]) => void) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return () => {};
+    }
+    
     // Real-time subscription to members table
     const subscription = supabase
       .channel('members-changes')
@@ -155,6 +165,11 @@ export const supabaseService = {
   },
 
   getMembers: async (): Promise<Member[]> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('members')
       .select('*')
@@ -168,6 +183,11 @@ export const supabaseService = {
   },
 
   addMember: async (member: Omit<Member, 'id'>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { data, error } = await supabase
       .from('members')
       .insert([member])
@@ -181,6 +201,11 @@ export const supabaseService = {
   },
 
   updateMember: async (id: string, updates: Partial<Member>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('members')
       .update(updates)
@@ -193,6 +218,11 @@ export const supabaseService = {
   },
 
   deleteMember: async (id: string) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('members')
       .delete()
@@ -205,6 +235,11 @@ export const supabaseService = {
   },
 
   batchUpdateMembers: async (updates: { id: string; updates: Partial<Member> }[]) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     // Process updates one by one since Supabase doesn't have a direct batch update
     const promises = updates.map(({ id, updates: memberUpdates }) => 
       supabase
@@ -223,6 +258,11 @@ export const supabaseService = {
 
   // Transactions
   subscribeToTransactions: (callback: (transactions: Transaction[]) => void) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return () => {};
+    }
+    
     const subscription = supabase
       .channel('transactions-changes')
       .on(
@@ -267,6 +307,11 @@ export const supabaseService = {
   },
 
   getTransactions: async (): Promise<Transaction[]> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('transactions')
       .select('*')
@@ -280,6 +325,11 @@ export const supabaseService = {
   },
 
   addTransaction: async (transaction: Omit<Transaction, 'id'>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { data, error } = await supabase
       .from('transactions')
       .insert([transaction])
@@ -293,6 +343,11 @@ export const supabaseService = {
   },
 
   deleteTransaction: async (id: string) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('transactions')
       .delete()
@@ -306,6 +361,11 @@ export const supabaseService = {
 
   // Items
   subscribeToItems: (callback: (items: Item[]) => void) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return () => {};
+    }
+    
     const subscription = supabase
       .channel('items-changes')
       .on(
@@ -350,6 +410,11 @@ export const supabaseService = {
   },
 
   getItems: async (): Promise<Item[]> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('items')
       .select('*')
@@ -363,6 +428,11 @@ export const supabaseService = {
   },
 
   addItem: async (item: Omit<Item, 'id'>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { data, error } = await supabase
       .from('items')
       .insert([item])
@@ -376,6 +446,11 @@ export const supabaseService = {
   },
 
   updateItem: async (id: string, updates: Partial<Item>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('items')
       .update(updates)
@@ -388,6 +463,11 @@ export const supabaseService = {
   },
 
   deleteItem: async (id: string) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('items')
       .delete()
@@ -401,6 +481,11 @@ export const supabaseService = {
 
   // Orders
   subscribeToOrders: (callback: (orders: Order[]) => void) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return () => {};
+    }
+    
     const subscription = supabase
       .channel('orders-changes')
       .on(
@@ -445,6 +530,11 @@ export const supabaseService = {
   },
 
   getOrders: async (): Promise<Order[]> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('orders')
       .select('*')
@@ -458,6 +548,11 @@ export const supabaseService = {
   },
 
   addOrder: async (order: Omit<Order, 'id'>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { data, error } = await supabase
       .from('orders')
       .insert([order])
@@ -471,6 +566,11 @@ export const supabaseService = {
   },
 
   updateOrder: async (id: string, updates: Partial<Order>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('orders')
       .update(updates)
@@ -484,6 +584,11 @@ export const supabaseService = {
 
   // Gang Fund
   subscribeToGangFund: (callback: (fund: GangFund | null) => void) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return () => {};
+    }
+    
     // For gang fund, we just get the single record with id 'main'
     supabase
       .from('gangfund')
@@ -523,6 +628,11 @@ export const supabaseService = {
   },
 
   getGangFund: async (): Promise<GangFund | null> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return null;
+    }
+    
     const { data, error } = await supabase
       .from('gangfund')
       .select('*')
@@ -540,6 +650,11 @@ export const supabaseService = {
   },
 
   updateGangFund: async (baseAmount: number, updatedBy: string) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const fundData = {
       id: 'main',
       baseAmount,
@@ -559,6 +674,11 @@ export const supabaseService = {
 
   // Audit Logs
   subscribeToAuditLogs: (callback: (auditLogs: AuditLog[]) => void) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return () => {};
+    }
+    
     const subscription = supabase
       .channel('auditlogs-changes')
       .on(
@@ -603,6 +723,11 @@ export const supabaseService = {
   },
 
   getAuditLogs: async (): Promise<AuditLog[]> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('auditlogs')
       .select('*')
@@ -616,6 +741,11 @@ export const supabaseService = {
   },
 
   addAuditLog: async (auditLog: Omit<AuditLog, 'id'>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { data, error } = await supabase
       .from('auditlogs')
       .insert([auditLog])
@@ -629,6 +759,11 @@ export const supabaseService = {
   },
 
   updateAuditLog: async (id: string, updates: Partial<AuditLog>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('auditlogs')
       .update(updates)
@@ -641,6 +776,11 @@ export const supabaseService = {
   },
 
   deleteAuditLog: async (id: string) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('auditlogs')
       .delete()
@@ -654,6 +794,11 @@ export const supabaseService = {
 
   // Weekly Payment Records
   subscribeToWeeklyPaymentRecords: (callback: (records: WeeklyPaymentRecord[]) => void) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return () => {};
+    }
+    
     const subscription = supabase
       .channel('weeklypaymentrecords-changes')
       .on(
@@ -698,6 +843,11 @@ export const supabaseService = {
   },
 
   getWeeklyPaymentRecords: async (): Promise<WeeklyPaymentRecord[]> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from('weeklypaymentrecords')
       .select('*')
@@ -711,6 +861,11 @@ export const supabaseService = {
   },
 
   addWeeklyPaymentRecord: async (record: Omit<WeeklyPaymentRecord, 'id'>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { data, error } = await supabase
       .from('weeklypaymentrecords')
       .insert([record])
@@ -725,6 +880,11 @@ export const supabaseService = {
 
   // Find existing weekly payment record for a specific member and week
   findWeeklyPaymentRecord: async (memberId: string, weekNumber: number): Promise<WeeklyPaymentRecord | null> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return null;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('weeklypaymentrecords')
@@ -748,6 +908,11 @@ export const supabaseService = {
 
   // Create or update weekly payment record (upsert)
   upsertWeeklyPaymentRecord: async (record: Omit<WeeklyPaymentRecord, 'id'>): Promise<void> => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     try {
       const existingRecord = await supabaseService.findWeeklyPaymentRecord(record.memberId, record.weekNumber);
       
@@ -773,6 +938,11 @@ export const supabaseService = {
   },
 
   updateWeeklyPaymentRecord: async (id: string, updates: Partial<WeeklyPaymentRecord>) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('weeklypaymentrecords')
       .update(updates)
@@ -785,6 +955,11 @@ export const supabaseService = {
   },
 
   deleteWeeklyPaymentRecord: async (id: string) => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      throw new Error('Supabase client not initialized');
+    }
+    
     const { error } = await supabase
       .from('weeklypaymentrecords')
       .delete()
@@ -798,6 +973,11 @@ export const supabaseService = {
 
   // Initialize default data
   initializeDefaultItems: async () => {
+    if (!supabase) {
+      console.error('Supabase client not initialized');
+      return;
+    }
+    
     try {
       // Check if items table is empty
       const { count, error: countError } = await supabase

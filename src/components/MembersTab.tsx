@@ -1,914 +1,409 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, UserCheck, UserX, DollarSign, Trash2, Save, Edit, Settings, GripVertical } from "lucide-react";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { 
+  ChevronDownIcon, 
+  ChevronUpIcon, 
+  DotsVerticalIcon, 
+  Pencil1Icon, 
+  TrashIcon,
+  PlusIcon
+} from "@radix-ui/react-icons";
 import { supabaseService as firestoreService, Transaction, Member, GangFund, Order, WeeklyPaymentRecord } from "@/lib/supabaseService";
 
-
-
+// Define the type for the props
 interface MembersTabProps {
-  isAdmin: boolean;
+  members: Member[];
+  setMembers: (members: Member[]) => void;
+  transactions: Transaction[];
+  setTransactions: (transactions: Transaction[]) => void;
+  gangFund: GangFund | null;
+  setGangFund: (fund: GangFund) => void;
+  orders: Order[];
+  setOrders: (orders: Order[]) => void;
+  weeklyPaymentRecords: WeeklyPaymentRecord[];
+  setWeeklyPaymentRecords: (records: WeeklyPaymentRecord[]) => void;
 }
 
-interface SortableMemberItemProps {
-  member: Member;
-  index: number;
-  isAdmin: boolean;
-  editingContribution: { [key: string]: string };
-  setEditingContribution: (value: { [key: string]: string }) => void;
-  updateMemberContribution: (memberId: string) => void;
-  startEditingContribution: (memberId: string, currentAmount: number) => void;
-  togglePayment: (memberId: string) => void;
-  deleteMember: (memberId: string) => void;
-  safeFormatDate: (value: string) => string;
-  onDragStart: (e: React.DragEvent, memberId: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent, memberId: string) => void;
-  isDragging: boolean;
-}
-
-const SortableMemberItem = ({
-  member,
-  index,
-  isAdmin,
-  editingContribution,
-  setEditingContribution,
-  updateMemberContribution,
-  startEditingContribution,
-  togglePayment,
-  deleteMember,
-  safeFormatDate,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  isDragging,
-}: SortableMemberItemProps) => {
-  return (
-    <div
-      draggable={isAdmin}
-      onDragStart={(e) => onDragStart(e, member.id)}
-      onDragOver={onDragOver}
-      onDrop={(e) => onDrop(e, member.id)}
-      className={`flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors cursor-move ${
-        isDragging ? 'opacity-50 shadow-lg border-2 border-primary' : ''
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        {/* Drag Handle (Admin Only) */}
-        {isAdmin && (
-          <div
-            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
-            title="Drag to reorder"
-          >
-            <GripVertical className="w-4 h-4 text-muted-foreground" />
-          </div>
-        )}
-        
-        <div className="w-10 h-10 bg-gang-purple/20 rounded-full flex items-center justify-center">
-          {member.hasPaid ? (
-            <UserCheck className="w-5 h-5 text-success" />
-          ) : (
-            <UserX className="w-5 h-5 text-destructive" />
-          )}
-        </div>
-        <div>
-          <h3 className="font-rajdhani font-bold">{member.name}</h3>
-          <p className="text-sm text-muted-foreground">
-            Joined: {safeFormatDate(member.joinDate)}
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3">
-        {/* Contribution Amount - Editable for Admin */}
-        <div className="flex flex-col items-end">
-          {isAdmin && editingContribution[member.id] ? (
-            <div className="flex gap-2 items-center">
-              <Input
-                type="number"
-                value={editingContribution[member.id]}
-                onChange={(e) => setEditingContribution({
-                  ...editingContribution, 
-                  [member.id]: e.target.value
-                })}
-                className="w-24 h-8 text-sm bg-input"
-                placeholder="Amount"
-              />
-              <Button
-                onClick={() => updateMemberContribution(member.id)}
-                size="sm"
-                className="h-8 px-2 btn-gang"
-              >
-                <Save className="w-3 h-3" />
-              </Button>
-              <Button
-                onClick={() => setEditingContribution({ 
-                  ...editingContribution, 
-                  [member.id]: "" 
-                })}
-                variant="outline"
-                size="sm"
-                className="h-8 px-2"
-              >
-                ×
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-orbitron font-bold">
-                ${member.contribution}
-              </span>
-              {isAdmin && (
-                <Button
-                  onClick={() => startEditingContribution(member.id, member.contribution)}
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 w-6 p-0 hover:bg-muted"
-                >
-                  <Edit className="w-3 h-3" />
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-
-        <Badge
-          variant={member.hasPaid ? "default" : "destructive"}
-          className={member.hasPaid ? "bg-success hover:bg-success/80" : ""}
-        >
-          {member.hasPaid ? "✅ Paid" : "❌ Pending"}
-        </Badge>
-        
-        {isAdmin && (
-          <div className="flex gap-2">
-            <Button
-              variant={member.hasPaid ? "default" : "outline"}
-              size="sm"
-              onClick={() => togglePayment(member.id)}
-              className={member.hasPaid ? 
-                "bg-success hover:bg-success/80 text-white border-success" : 
-                "btn-gang-outline hover:bg-success/10 hover:border-success hover:text-success transition-colors"
-              }
-            >
-              {member.hasPaid ? "✅ Mark Unpaid" : "💰 Mark Paid"}
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => deleteMember(member.id)}
-              className="bg-destructive hover:bg-destructive/80"
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export const MembersTab = ({ isAdmin }: MembersTabProps) => {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [weeklyPaymentRecords, setWeeklyPaymentRecords] = useState<WeeklyPaymentRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
+export default function MembersTab({
+  members,
+  setMembers,
+  transactions,
+  setTransactions,
+  gangFund,
+  setGangFund,
+  orders,
+  setOrders,
+  weeklyPaymentRecords,
+  setWeeklyPaymentRecords
+}: MembersTabProps) {
   const [newMemberName, setNewMemberName] = useState("");
-  const [gangFund, setGangFund] = useState<GangFund | null>(null);
-  const [isEditingFunds, setIsEditingFunds] = useState(false);
-  const [editFundAmount, setEditFundAmount] = useState("");
-  const [editingContribution, setEditingContribution] = useState<{ [key: string]: string }>({});
-  const [creatingTestData, setCreatingTestData] = useState(false);
-  const [draggedMemberId, setDraggedMemberId] = useState<string | null>(null);
-  const [lastResetDate, setLastResetDate] = useState<string | null>(null);
+  const [newMemberContribution, setNewMemberContribution] = useState(100);
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editContribution, setEditContribution] = useState(100);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 
-  const safeFormatDate = (value: string) => {
+  // Calculate total members and total paid
+  const totalMembers = members.length;
+  const totalPaid = members.filter(m => m.hasPaid).length;
+  const totalWeeklyAmount = members.reduce((sum, member) => sum + member.contribution, 0);
+
+  // Function to add a new member
+  const handleAddMember = async () => {
+    if (!newMemberName.trim()) return;
+
     try {
-      const d = new Date(value);
-      if (Number.isNaN(d.getTime())) return value || 'Unknown';
-      return d.toLocaleDateString();
-    } catch {
-      return value || 'Unknown';
-    }
-  };
-
-  const checkAndResetWeeklyPayments = async () => {
-    const today = new Date();
-    const todayString = today.toISOString().split('T')[0];
-    
-    // Check if today is Sunday (day 0)
-    const isSunday = today.getDay() === 0;
-    
-    // Check if we've already reset this week
-    const lastReset = localStorage.getItem('lastWeeklyReset');
-    
-    if (isSunday && lastReset !== todayString) {
-      console.log('🔄 It\'s Sunday! Resetting all member payments...');
-      
-      try {
-        // Get all members who have paid
-        const paidMembers = members.filter(member => member.hasPaid);
-        
-        if (paidMembers.length > 0) {
-          // Batch update all paid members to unpaid
-          const updates = paidMembers.map(member => ({
-            id: member.id,
-            updates: { hasPaid: false }
-          }));
-          
-          await firestoreService.batchUpdateMembers(updates);
-          
-          // Update localStorage to track last reset
-          localStorage.setItem('lastWeeklyReset', todayString);
-          setLastResetDate(todayString);
-          
-          console.log(`✅ Reset ${paidMembers.length} members' payment status for the new week`);
-        }
-      } catch (error) {
-        console.error('❌ Error resetting weekly payments:', error);
-      }
-    }
-  };
-
-  // Fetch data from Supabase
-  useEffect(() => {
-    let isCancelled = false;
-    
-    const fetchData = async () => {
-      try {
-        // Fetch all data
-        const [membersData, ordersData, transactionsData, paymentRecordsData] = await Promise.all([
-          firestoreService.getMembers(),
-          firestoreService.getOrders(),
-          firestoreService.getTransactions(),
-          firestoreService.getWeeklyPaymentRecords()
-        ]);
-        
-        if (!isCancelled) {
-          console.log('📥 Received members data:', membersData);
-          
-          // Clear timeout and hide error when data is received
-          clearTimeout(timeoutId);
-          setLoadError(false);
-          
-          // Validate that we have an array
-          if (!Array.isArray(membersData)) {
-            console.error('❌ Expected array of members, got:', typeof membersData, membersData);
-            setMembers([]);
-            setLoading(false);
-            return;
-          }
-          
-          // Validate each member object
-          const validMembers = membersData.filter(member => {
-            const isValid = member && 
-              typeof member === 'object' && 
-              typeof member.id === 'string' && 
-              typeof member.name === 'string' && 
-              typeof member.contribution === 'number' && 
-              typeof member.hasPaid === 'boolean' && 
-              typeof member.joinDate === 'string';
-            
-            if (!isValid) {
-              console.error('❌ Invalid member data:', member);
-            }
-            
-            return isValid;
-          });
-          
-          setMembers(validMembers);
-          setOrders(ordersData);
-          setTransactions(transactionsData);
-          setWeeklyPaymentRecords(paymentRecordsData);
-          console.log('📊 Members tab received payment records:', paymentRecordsData.length);
-          
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        if (!isCancelled) {
-          setLoading(false);
-          setLoadError(true);
-        }
-      }
-    };
-    
-    // Set a timeout to stop loading state if data doesn't load within 10 seconds
-    const timeoutId = setTimeout(() => {
-      setLoading(false);
-      setLoadError(true);
-    }, 10000);
-    
-    fetchData();
-    
-    // Set up real-time subscriptions if supported
-    const unsubscribeMembers = firestoreService.subscribeToMembers((newMembers) => {
-      if (!isCancelled) {
-        setMembers(newMembers);
-      }
-    });
-    
-    const unsubscribeOrders = firestoreService.subscribeToOrders((newOrders) => {
-      if (!isCancelled) {
-        setOrders(newOrders);
-      }
-    });
-    
-    const unsubscribeTransactions = firestoreService.subscribeToTransactions((newTransactions) => {
-      if (!isCancelled) {
-        setTransactions(newTransactions);
-      }
-    });
-    
-    const unsubscribePaymentRecords = firestoreService.subscribeToWeeklyPaymentRecords((newRecords) => {
-      if (!isCancelled) {
-        setWeeklyPaymentRecords(newRecords);
-        console.log('📊 Members tab received payment records:', newRecords.length);
-      }
-    });
-    
-    return () => {
-      isCancelled = true;
-      clearTimeout(timeoutId);
-      unsubscribeMembers();
-      unsubscribeOrders();
-      unsubscribeTransactions();
-      unsubscribePaymentRecords();
-    };
-  }, []);
-
-  // Subscribe to gang fund updates
-  useEffect(() => {
-    const unsubscribe = firestoreService.subscribeToGangFund((fundData) => {
-      setGangFund(fundData);
-      if (fundData && !editFundAmount) {
-        setEditFundAmount(fundData.baseAmount.toString());
-      }
-    });
-
-    return () => unsubscribe();
-  }, [editFundAmount]);
-
-  // Check for weekly reset on component mount and when members change
-  useEffect(() => {
-    if (members.length > 0) {
-      checkAndResetWeeklyPayments();
-    }
-  }, [members]);
-
-  const addMember = async () => {
-    if (newMemberName.trim()) {
-      const newMember = {
+      const newMemberData = {
         name: newMemberName.trim(),
-        contribution: 500,
+        contribution: newMemberContribution,
         hasPaid: false,
         joinDate: new Date().toISOString().split('T')[0],
-        order: members.length // Set order as the next position
+        order: members.length // Set order to current length to add at the end
       };
-      try {
-        await firestoreService.addMember(newMember);
-        setNewMemberName("");
-      } catch (error) {
-        console.error('Error adding member:', error);
-      }
-    }
-  };
 
-  const togglePayment = async (memberId: string) => {
-    const member = members.find(m => m.id === memberId);
-    if (member) {
-      const newPaidStatus = !member.hasPaid;
+      const newMember = await firestoreService.addMember(newMemberData);
+      setMembers([...members, newMember]);
       
-      // Optimistic update - update local state immediately
-      const updatedMembers = members.map(m => 
-        m.id === memberId ? { ...m, hasPaid: newPaidStatus } : m
-      );
-      setMembers(updatedMembers);
-
-      try {
-        // Update member's current status
-        await firestoreService.updateMember(memberId, { hasPaid: newPaidStatus });
-        
-        // Also update weekly payment record for current week (week 1)
-        await updateCurrentWeekPaymentRecord(memberId, member, newPaidStatus);
-        
-        console.log(`✅ Updated payment status for ${member.name}: ${newPaidStatus ? 'PAID' : 'PENDING'}`);
-        console.log('📊 Weekly payment record synchronized with audit logs');
-        
-      } catch (error) {
-        console.error('Error updating member:', error);
-        // Revert optimistic update on error
-        const revertedMembers = members.map(m => 
-          m.id === memberId ? { ...m, hasPaid: member.hasPaid } : m
-        );
-        setMembers(revertedMembers);
-      }
+      // Reset form
+      setNewMemberName("");
+      setNewMemberContribution(100);
+      setIsAddDialogOpen(false);
+    } catch (error) {
+      console.error("Error adding member:", error);
+      alert("Failed to add member. Please try again.");
     }
   };
 
-  const updateCurrentWeekPaymentRecord = async (memberId: string, member: Member, hasPaid: boolean) => {
-    const today = new Date();
-    const weekStart = new Date(today);
-    weekStart.setDate(today.getDate() - today.getDay()); // Start of current week (Sunday)
-    weekStart.setHours(0, 0, 0, 0);
-    
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekStart.getDate() + 6); // End of current week (Saturday)
-    weekEnd.setHours(23, 59, 59, 999);
-    
-    const weekNumber = 1; // Current week is always week 1 in audit logs
-    
+  // Function to update a member
+  const handleUpdateMember = async () => {
+    if (!editingMember) return;
+
     try {
-      await firestoreService.upsertWeeklyPaymentRecord({
-        memberId,
-        memberName: member.name,
-        weekStart: weekStart.toISOString().split('T')[0],
-        weekEnd: weekEnd.toISOString().split('T')[0],
-        weekNumber,
-        contribution: member.contribution,
-        hasPaid: hasPaid,
-        paymentDate: hasPaid ? new Date().toISOString().split('T')[0] : undefined,
-        markedBy: 'admin',
-        markedAt: new Date().toISOString()
+      await firestoreService.updateMember(editingMember.id, {
+        name: editName.trim(),
+        contribution: editContribution
       });
+
+      setMembers(members.map(m => 
+        m.id === editingMember.id 
+          ? { ...m, name: editName.trim(), contribution: editContribution } 
+          : m
+      ));
+      
+      setEditingMember(null);
+      setIsEditDialogOpen(false);
     } catch (error) {
-      console.error('Error updating weekly payment record:', error);
-      // Don't throw - member status update should still succeed
+      console.error("Error updating member:", error);
+      alert("Failed to update member. Please try again.");
     }
   };
 
-  const deleteMember = async (memberId: string) => {
+  // Function to delete a member
+  const handleDeleteMember = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete member "${name}"?`)) return;
+
     try {
-      await firestoreService.deleteMember(memberId);
+      await firestoreService.deleteMember(id);
+      setMembers(members.filter(m => m.id !== id));
     } catch (error) {
-      console.error('Error deleting member:', error);
+      console.error("Error deleting member:", error);
+      alert("Failed to delete member. Please try again.");
     }
   };
 
-  const updateGangFund = async () => {
-    if (editFundAmount.trim()) {
-      try {
-        await firestoreService.updateGangFund(parseFloat(editFundAmount), 'admin');
-        setIsEditingFunds(false);
-      } catch (error) {
-        console.error('Error updating gang fund:', error);
-      }
-    }
-  };
-
-  const updateMemberContribution = async (memberId: string) => {
-    const newAmount = editingContribution[memberId];
-    if (newAmount && !isNaN(parseFloat(newAmount))) {
-      try {
-        await firestoreService.updateMember(memberId, { contribution: parseFloat(newAmount) });
-        setEditingContribution({ ...editingContribution, [memberId]: "" });
-      } catch (error) {
-        console.error('Error updating contribution:', error);
-      }
-    }
-  };
-
-  const startEditingContribution = (memberId: string, currentAmount: number) => {
-    setEditingContribution({ ...editingContribution, [memberId]: currentAmount.toString() });
-  };
-
-  const handleDragStart = (e: React.DragEvent, memberId: string) => {
-    setDraggedMemberId(memberId);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetMemberId: string) => {
-    e.preventDefault();
-    
-    if (!draggedMemberId || draggedMemberId === targetMemberId) {
-      setDraggedMemberId(null);
-      return;
-    }
-
-    const sortedMembers = [...members].sort((a, b) => (a.order || 0) - (b.order || 0));
-    const draggedIndex = sortedMembers.findIndex(member => member.id === draggedMemberId);
-    const targetIndex = sortedMembers.findIndex(member => member.id === targetMemberId);
-
-    if (draggedIndex === -1 || targetIndex === -1) {
-      setDraggedMemberId(null);
-      return;
-    }
-
-    // Create new array with reordered members
-    const reorderedMembers = [...sortedMembers];
-    const [draggedMember] = reorderedMembers.splice(draggedIndex, 1);
-    reorderedMembers.splice(targetIndex, 0, draggedMember);
-
-    // Update orders in Firestore
+  // Function to update payment status
+  const handlePaymentStatusChange = async (id: string, hasPaid: boolean) => {
     try {
-      const updatePromises = reorderedMembers.map((member, index) => 
-        firestoreService.updateMember(member.id, { order: index })
-      );
-      await Promise.all(updatePromises);
+      await firestoreService.updateMember(id, { hasPaid });
+      setMembers(members.map(m => 
+        m.id === id ? { ...m, hasPaid } : m
+      ));
     } catch (error) {
-      console.error('Error reordering members:', error);
+      console.error("Error updating payment status:", error);
+      alert("Failed to update payment status. Please try again.");
     }
-
-    setDraggedMemberId(null);
   };
 
-  const createTestData = async () => {
-    setCreatingTestData(true);
+  // Function to move a member up in the list
+  const moveMemberUp = async (index: number) => {
+    if (index <= 0) return;
+
+    const newMembers = [...members];
+    [newMembers[index], newMembers[index - 1]] = [newMembers[index - 1], newMembers[index]];
+    
+    // Update the order field in the database
     try {
-      console.log('🎯 Creating test members...');
+      await firestoreService.batchUpdateMembers([
+        { id: newMembers[index].id, updates: { order: index } },
+        { id: newMembers[index - 1].id, updates: { order: index - 1 } }
+      ]);
       
-      // Create test members with gang-themed names
-      const testMembers = [
-        {
-          name: "Big Mike",
-          contribution: 500,
-          hasPaid: true,
-          joinDate: "2024-01-15",
-          order: members.length
-        },
-        {
-          name: "Lil Tony",
-          contribution: 300,
-          hasPaid: false,
-          joinDate: "2024-02-10",
-          order: members.length + 1
-        },
-        {
-          name: "Purple Reign",
-          contribution: 750,
-          hasPaid: true,
-          joinDate: "2024-01-05",
-          order: members.length + 2
-        }
-      ];
-      
-      for (const member of testMembers) {
-        await firestoreService.addMember(member);
-        console.log('✅ Added member:', member.name);
-      }
-      
-      console.log('✅ All test members recruited!');
+      setMembers(newMembers);
     } catch (error) {
-      console.error('❌ Error recruiting members:', error);
-    } finally {
-      setCreatingTestData(false);
+      console.error("Error moving member up:", error);
+      alert("Failed to move member. Please try again.");
     }
   };
 
-  // Calculate total collected from audit logs (all weekly payment records)
-  const calculateAuditLogsTotalCollected = () => {
-    // Create a map to store the most recent record for each member-week combination
-    const memberWeekMap = new Map<string, WeeklyPaymentRecord>();
+  // Function to move a member down in the list
+  const moveMemberDown = async (index: number) => {
+    if (index >= members.length - 1) return;
+
+    const newMembers = [...members];
+    [newMembers[index], newMembers[index + 1]] = [newMembers[index + 1], newMembers[index]];
     
-    weeklyPaymentRecords.forEach(record => {
-      const key = `${record.memberId}-${record.weekNumber}`;
-      const existing = memberWeekMap.get(key);
+    // Update the order field in the database
+    try {
+      await firestoreService.batchUpdateMembers([
+        { id: newMembers[index].id, updates: { order: index } },
+        { id: newMembers[index + 1].id, updates: { order: index + 1 } }
+      ]);
       
-      // Keep the most recent record (highest markedAt)
-      if (!existing || new Date(record.markedAt) > new Date(existing.markedAt)) {
-        memberWeekMap.set(key, record);
-      }
-    });
-    
-    // Sum up contributions from paid records
-    let totalCollected = 0;
-    memberWeekMap.forEach(record => {
-      if (record.hasPaid) {
-        totalCollected += record.contribution;
-      }
-    });
-    
-    return totalCollected;
+      setMembers(newMembers);
+    } catch (error) {
+      console.error("Error moving member down:", error);
+      alert("Failed to move member. Please try again.");
+    }
   };
 
-  const paidMembers = members.filter(m => m.hasPaid);
-  const currentWeekContributions = paidMembers.reduce((sum, member) => sum + member.contribution, 0);
-  const auditLogsTotalCollected = calculateAuditLogsTotalCollected();
-  const baseAmount = gangFund?.baseAmount || 20000;
-  
-  // Add approved orders to collected funds
-  const approvedOrdersTotal = orders
-    .filter(order => order.status === 'approved' || order.status === 'completed')
-    .reduce((sum, order) => sum + order.totalAmount, 0);
-  
-  // Calculate net balance from transactions (Money Moves)
-  const totalSpent = transactions.filter(t => t.type === 'expense').reduce((sum, exp) => sum + exp.amount, 0);
-  const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, inc) => sum + inc.amount, 0);
-  const netTransactionBalance = totalIncome - totalSpent;
-  
-  // Calculate comprehensive total funds using audit logs data
-  const totalFunds = baseAmount + auditLogsTotalCollected + approvedOrdersTotal + netTransactionBalance;
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading gang members...</p>
-          {loadError && (
-            <p className="text-destructive mt-2">Error loading data. Please check your Firebase connection.</p>
-          )}
-        </div>
-      </div>
-    );
-  }
+  // Function to open edit dialog
+  const openEditDialog = (member: Member) => {
+    setEditingMember(member);
+    setEditName(member.name);
+    setEditContribution(member.contribution);
+    setIsEditDialogOpen(true);
+  };
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Members</h2>
+          <p className="text-muted-foreground">
+            Manage your gang members and their payment status
+          </p>
+        </div>
+        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <PlusIcon className="mr-2 h-4 w-4" />
+              Add Member
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Member</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="memberName">Member Name</Label>
+                <Input
+                  id="memberName"
+                  value={newMemberName}
+                  onChange={(e) => setNewMemberName(e.target.value)}
+                  placeholder="Enter member name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="contribution">Weekly Contribution ($)</Label>
+                <Input
+                  id="contribution"
+                  type="number"
+                  value={newMemberContribution}
+                  onChange={(e) => setNewMemberContribution(Number(e.target.value))}
+                  placeholder="Enter contribution amount"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleAddMember}>Add Member</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="card-gang">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-rajdhani text-muted-foreground">Total Members</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Members</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-orbitron font-bold text-gang-glow">
-              {members.length}
-            </div>
+            <div className="text-2xl font-bold">{totalMembers}</div>
+            <p className="text-xs text-muted-foreground">All crew members</p>
           </CardContent>
         </Card>
-
-        <Card className="card-gang">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-rajdhani text-muted-foreground">Paid This Week</CardTitle>
+            <CardTitle className="text-sm font-medium">Paid Up</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-orbitron font-bold text-success">
-              {paidMembers.length}/{members.length}
-            </div>
+            <div className="text-2xl font-bold">{totalPaid}</div>
+            <p className="text-xs text-muted-foreground">Members who paid</p>
           </CardContent>
         </Card>
-
-        <Card className="card-gang">
+        <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-rajdhani text-muted-foreground">
-              <DollarSign className="w-4 h-4 inline mr-1" />
-              Total Gang Funds
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Weekly Total</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-orbitron font-bold text-gang-neon">
-              ${totalFunds.toLocaleString()}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Base: ${baseAmount.toLocaleString()} + Audit Total: ${auditLogsTotalCollected.toLocaleString()} + Orders: ${approvedOrdersTotal.toLocaleString()} + Net: ${netTransactionBalance.toLocaleString()}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-gang">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-rajdhani text-muted-foreground">Weekly Reset</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm font-orbitron font-bold text-gang-glow">
-              {lastResetDate ? `Last: ${safeFormatDate(lastResetDate)}` : 'Auto-reset on Sundays'}
-            </div>
-            <div className="text-xs text-muted-foreground mt-1">
-              {new Date().getDay() === 0 ? '🔄 Reset Day!' : 'Next: Sunday'}
-            </div>
+            <div className="text-2xl font-bold">${totalWeeklyAmount}</div>
+            <p className="text-xs text-muted-foreground">Total contribution</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Comprehensive Financial Overview */}
-      <Card className="card-gang">
-        <CardHeader>
-          <CardTitle className="font-orbitron text-gang-glow flex items-center">
-            <DollarSign className="w-5 h-5 mr-2" />
-            💰 Comprehensive Financial Overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Income Sources */}
-            <div className="space-y-3">
-              <h4 className="font-rajdhani font-bold text-success text-lg">💰 Income Sources</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Base Gang Fund</span>
-                  <span className="font-orbitron font-bold text-success">${baseAmount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Audit Logs Total Collected</span>
-                  <span className="font-orbitron font-bold text-success">${auditLogsTotalCollected.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-success/20 rounded">
-                  <span className="text-sm">Current Week Contributions</span>
-                  <span className="font-orbitron font-bold text-success">${currentWeekContributions.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Approved Orders</span>
-                  <span className="font-orbitron font-bold text-success">${approvedOrdersTotal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-success/10 rounded">
-                  <span className="text-sm">Transaction Income</span>
-                  <span className="font-orbitron font-bold text-success">${totalIncome.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Expenses */}
-            <div className="space-y-3">
-              <h4 className="font-rajdhani font-bold text-destructive text-lg">💸 Expenses</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-2 bg-destructive/10 rounded">
-                  <span className="text-sm">Transaction Expenses</span>
-                  <span className="font-orbitron font-bold text-destructive">${totalSpent.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-muted/20 rounded">
-                  <span className="text-sm">Net Transaction Balance</span>
-                  <span className={`font-orbitron font-bold ${netTransactionBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    ${netTransactionBalance.toLocaleString()}
+      {/* Members List */}
+      <div className="space-y-4">
+        {members.map((member, index) => (
+          <Card key={member.id} className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <div className="flex flex-col">
+                  <span className="font-medium">{member.name}</span>
+                  <span className="text-sm text-muted-foreground">
+                    ${member.contribution}/week
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Total Summary */}
-          <div className="mt-6 p-4 bg-gang-purple/20 rounded-lg border border-gang-purple/30">
-            <div className="flex justify-between items-center">
-              <span className="font-rajdhani font-bold text-lg text-gang-glow">🎯 Total Gang Funds</span>
-              <span className="text-3xl font-orbitron font-bold text-gang-neon">
-                ${totalFunds.toLocaleString()}
-              </span>
-            </div>
-            <div className="text-sm text-muted-foreground mt-2">
-              Comprehensive balance including base fund, audit logs total collected, approved orders, and net transaction balance
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Gang Fund Management (Admin Only) */}
-      {isAdmin && (
-        <Card className="card-gang">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-gang-glow flex items-center">
-              <Settings className="w-5 h-5 mr-2" />
-              Gang Fund Management 💰
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <label className="text-sm font-rajdhani text-muted-foreground">Base Gang Fund Amount</label>
-                {isEditingFunds ? (
-                  <div className="flex gap-2 mt-2">
-                    <Input
-                      type="number"
-                      value={editFundAmount}
-                      onChange={(e) => setEditFundAmount(e.target.value)}
-                      className="bg-input"
-                      placeholder="Enter base amount"
-                    />
-                    <Button onClick={updateGangFund} size="sm" className="btn-gang">
-                      <Save className="w-4 h-4 mr-1" />
-                      Save
-                    </Button>
-                    <Button 
-                      onClick={() => {
-                        setIsEditingFunds(false);
-                        setEditFundAmount(gangFund?.baseAmount.toString() || "20000");
-                      }} 
-                      variant="outline" 
-                      size="sm"
+              
+              <div className="flex items-center space-x-2">
+                <div className="flex flex-col items-end">
+                  <div className="flex items-center space-x-2">
+                    <Badge 
+                      variant={member.hasPaid ? "default" : "destructive"}
+                      className="capitalize"
                     >
-                      Cancel
+                      {member.hasPaid ? "Paid" : "Unpaid"}
+                    </Badge>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePaymentStatusChange(member.id, !member.hasPaid)}
+                    >
+                      {member.hasPaid ? "Mark Unpaid" : "Mark Paid"}
                     </Button>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2 mt-2">
-                    <div className="text-lg font-orbitron font-bold text-gang-neon">
-                      ${baseAmount.toLocaleString()}
-                    </div>
-                    <Button 
-                      onClick={() => setIsEditingFunds(true)} 
-                      variant="outline" 
-                      size="sm"
-                      className="btn-gang-outline"
-                    >
-                      <Edit className="w-4 h-4 mr-1" />
+                </div>
+                
+                <div className="flex items-center space-x-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => moveMemberUp(index)}
+                    disabled={index === 0}
+                  >
+                    <ChevronUpIcon className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => moveMemberDown(index)}
+                    disabled={index === members.length - 1}
+                  >
+                    <ChevronDownIcon className="h-4 w-4" />
+                  </Button>
+                </div>
+                
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm">
+                      <DotsVerticalIcon className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => openEditDialog(member)}>
+                      <Pencil1Icon className="mr-2 h-4 w-4" />
                       Edit
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Last updated: {gangFund?.lastUpdated ? new Date(gangFund.lastUpdated).toLocaleString() : 'Never'}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Add New Member (Admin Only) */}
-      {isAdmin && (
-        <Card className="card-gang">
-          <CardHeader>
-            <CardTitle className="font-orbitron text-gang-glow">
-              Add New Gang Member 👥
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex gap-3">
-              <Input
-                placeholder="Enter member name..."
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                className="flex-1 bg-input"
-                onKeyPress={(e) => e.key === 'Enter' && addMember()}
-              />
-              <Button onClick={addMember} className="btn-gang">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Member
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Members List */}
-      <Card className="card-gang">
-        <CardHeader>
-          <CardTitle className="font-orbitron text-gang-glow">
-            Gang Members & Weekly Contributions 💜
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {members && Array.isArray(members) && members.length > 0 ? (
-              [...members]
-                .sort((a, b) => (a.order || 0) - (b.order || 0))
-                .map((member, index) => {
-                  // Additional safety check for each member
-                  if (!member || typeof member !== 'object' || !member.id) {
-                    console.error('❌ Skipping invalid member:', member);
-                    return null;
-                  }
-                  
-                  return (
-                    <SortableMemberItem
-                      key={member.id}
-                      member={member}
-                      index={index}
-                      isAdmin={isAdmin}
-                      editingContribution={editingContribution}
-                      setEditingContribution={setEditingContribution}
-                      updateMemberContribution={updateMemberContribution}
-                      startEditingContribution={startEditingContribution}
-                      togglePayment={togglePayment}
-                      deleteMember={deleteMember}
-                      safeFormatDate={safeFormatDate}
-                      onDragStart={handleDragStart}
-                      onDragOver={handleDragOver}
-                      onDrop={handleDrop}
-                      isDragging={draggedMemberId === member.id}
-                    />
-                  );
-                })
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                <UserX className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p className="mb-4">No gang members yet. Time to recruit! 🎯</p>
-                {isAdmin && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gang-glow mb-3">
-                      Quick recruit some members to get started:
-                    </p>
-                    <Button 
-                      onClick={createTestData} 
-                      disabled={creatingTestData}
-                      className="btn-gang"
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleDeleteMember(member.id, member.name)}
+                      className="text-destructive"
                     >
-                      {creatingTestData ? (
-                        <div className="flex items-center gap-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Recruiting...
-                        </div>
-                      ) : (
-                        <>
-                          <Plus className="w-4 h-4 mr-2" />
-                          Recruit Gang Members 👥
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                )}
+                      <TrashIcon className="mr-2 h-4 w-4" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-            )}
+            </div>
+            
+            <Separator className="my-3" />
+            
+            <div className="text-sm text-muted-foreground">
+              <span>Joined: {member.joinDate}</span>
+            </div>
+          </Card>
+        ))}
+        
+        {members.length === 0 && (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground">No members yet. Add your first member to get started.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Edit Member Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Member</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="editName">Member Name</Label>
+              <Input
+                id="editName"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="Enter member name"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="editContribution">Weekly Contribution ($)</Label>
+              <Input
+                id="editContribution"
+                type="number"
+                value={editContribution}
+                onChange={(e) => setEditContribution(Number(e.target.value))}
+                placeholder="Enter contribution amount"
+              />
+            </div>
           </div>
-        </CardContent>
-      </Card>
+          <DialogFooter>
+            <Button onClick={handleUpdateMember}>Update Member</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-};
+}

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ShoppingCart, Package, Clock, CheckCircle, AlertTriangle, Plus, Edit, Trash2, Save } from "lucide-react";
-import { supabaseService as firestoreService, Transaction, Item, Order } from "@/lib/supabaseService";
+import { mongoService as firestoreService, Transaction, Item, Order } from "@/lib/mongoService";
 
 // EditItemForm component to handle item editing safely
 interface EditItemFormProps {
@@ -137,7 +137,7 @@ export const OrdersTab = (props: OrdersTabProps) => {
     quantity: 1
   });
 
-  // Fetch data from Supabase
+  // Fetch data from MongoDB
   useEffect(() => {
     let isCancelled = false;
     
@@ -153,7 +153,7 @@ export const OrdersTab = (props: OrdersTabProps) => {
           setOrders(ordersData);
           
           if (itemsData.length > 0 && !newOrder.selectedItemId) {
-            setNewOrder(prev => ({ ...prev, selectedItemId: itemsData[0].id }));
+            setNewOrder(prev => ({ ...prev, selectedItemId: itemsData[0]._id || '' }));
           }
           
           setLoading(false);
@@ -177,55 +177,44 @@ export const OrdersTab = (props: OrdersTabProps) => {
     
     fetchData();
     
-    // Set up real-time subscriptions if supported
-    const unsubscribeItems = firestoreService.subscribeToItems((newItems) => {
-      if (!isCancelled) {
-        setAvailableItems(newItems);
-        if (newItems.length > 0 && !newOrder.selectedItemId) {
-          setNewOrder(prev => ({ ...prev, selectedItemId: newItems[0].id }));
-        }
-      }
-    });
-
-    const unsubscribeOrders = firestoreService.subscribeToOrders((newOrders) => {
-      if (!isCancelled) {
-        setOrders(newOrders);
-      }
-    });
-
-    // Initialize default items if none exist
-    if (!isCancelled) {
-      firestoreService.initializeDefaultItems();
-    }
+    // Poll for updates every 30 seconds since MongoDB doesn't have real-time subscriptions
+    const intervalId = setInterval(fetchData, 30000);
 
     return () => {
       isCancelled = true;
       clearTimeout(timeoutId);
-      unsubscribeItems();
-      unsubscribeOrders();
+      clearInterval(intervalId);
     };
-  }, [newOrder.selectedItemId]);
+  }, []);
 
   const placeOrder = async () => {
     if (newOrder.memberName.trim() && newOrder.selectedItemId) {
-      const selectedItem = availableItems.find(item => item.id === newOrder.selectedItemId);
+      const selectedItem = availableItems.find(item => item._id === newOrder.selectedItemId);
       if (selectedItem) {
         const order = {
-          memberId: "temp-member-id", // This would normally come from user auth
+          memberId: '', // Will be set by backend
           memberName: newOrder.memberName.trim(),
           items: [{
-            itemId: selectedItem.id,
+            itemId: selectedItem._id || '',
             itemName: selectedItem.name,
             quantity: newOrder.quantity,
             price: selectedItem.price
           }],
           totalAmount: selectedItem.price * newOrder.quantity,
           status: 'pending' as const,
-          orderDate: new Date().toISOString().split('T')[0]
+          orderDate: new Date().toISOString()
         };
+        
         try {
           await firestoreService.addOrder(order);
-          setNewOrder({ memberName: "", selectedItemId: availableItems[0]?.id || "", quantity: 1 });
+          setNewOrder({ memberName: "", selectedItemId: availableItems[0]?._id || "", quantity: 1 });
+          // Refresh data after adding order
+          const [updatedItems, updatedOrders] = await Promise.all([
+            firestoreService.getItems(),
+            firestoreService.getOrders()
+          ]);
+          setAvailableItems(updatedItems);
+          setOrders(updatedOrders);
         } catch (error) {
           console.error('Error placing order:', error);
         }
@@ -233,17 +222,43 @@ export const OrdersTab = (props: OrdersTabProps) => {
     }
   };
 
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      await firestoreService.updateOrder(orderId, { status });
+      // Refresh data after updating
+      const updatedOrders = await firestoreService.getOrders();
+      setOrders(updatedOrders);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+    }
+  };
+
+  const deleteOrder = async (orderId: string) => {
+    try {
+      await firestoreService.updateOrder(orderId, { status: 'cancelled' });
+      // Refresh data after deleting
+      const updatedOrders = await firestoreService.getOrders();
+      setOrders(updatedOrders);
+    } catch (error) {
+      console.error('Error deleting order:', error);
+    }
+  };
+
   const addItem = async () => {
-    if (newItem.name.trim() && newItem.price && newItem.description) {
+    if (newItem.name.trim() && newItem.price) {
       const item = {
         name: newItem.name.trim(),
         price: parseFloat(newItem.price),
-        category: 'other' as const,
-        description: newItem.description.trim()
+        description: newItem.description.trim(),
+        category: 'other'
       };
+      
       try {
         await firestoreService.addItem(item);
         setNewItem({ name: "", price: "", description: "" });
+        // Refresh data after adding item
+        const updatedItems = await firestoreService.getItems();
+        setAvailableItems(updatedItems);
       } catch (error) {
         console.error('Error adding item:', error);
       }
@@ -254,6 +269,9 @@ export const OrdersTab = (props: OrdersTabProps) => {
     try {
       await firestoreService.updateItem(itemId, updates);
       setEditingItem(null);
+      // Refresh data after updating
+      const updatedItems = await firestoreService.getItems();
+      setAvailableItems(updatedItems);
     } catch (error) {
       console.error('Error updating item:', error);
     }
@@ -262,34 +280,12 @@ export const OrdersTab = (props: OrdersTabProps) => {
   const deleteItem = async (itemId: string) => {
     try {
       await firestoreService.deleteItem(itemId);
+      // Refresh data after deleting
+      const updatedItems = await firestoreService.getItems();
+      setAvailableItems(updatedItems);
     } catch (error) {
       console.error('Error deleting item:', error);
     }
-  };
-
-  const updateOrderStatus = async (orderId: string, newStatus: Order['status']) => {
-    try {
-      await firestoreService.updateOrder(orderId, { status: newStatus });
-    } catch (error) {
-      console.error('Error updating order status:', error);
-    }
-  };
-
-  const getStatusBadge = (status: Order['status']) => {
-    const styles = {
-      pending: { class: "bg-warning text-gang-dark", icon: Clock },
-      approved: { class: "bg-gang-purple text-gang-dark", icon: Package },
-      completed: { class: "bg-success", icon: CheckCircle },
-      cancelled: { class: "bg-destructive", icon: AlertTriangle }
-    };
-    
-    const { class: className, icon: Icon } = styles[status];
-    return (
-      <Badge className={className}>
-        <Icon className="w-3 h-3 mr-1" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </Badge>
-    );
   };
 
   if (loading) {
@@ -367,59 +363,56 @@ export const OrdersTab = (props: OrdersTabProps) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {availableItems.map((item) => (
               <div
-                key={item.id}
+                key={item._id}
                 className="p-4 bg-muted/50 rounded-lg border border-border/50 hover:border-primary/50 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
-                    {editingItem === item.id && isAdmin ? (
+                    {editingItem === item._id && isAdmin ? (
                       <EditItemForm 
                         item={item}
-                        onSave={(updates) => updateItem(item.id, updates)}
+                        onSave={(updates) => updateItem(item._id!, updates)}
                         onCancel={() => setEditingItem(null)}
                       />
                     ) : (
                       <>
-                        <h3 className="font-rajdhani font-bold text-lg flex items-center gap-2">
-                          <span className="text-2xl">📦</span>
-                          {item.name}
-                        </h3>
+                        <h3 className="font-semibold">{item.name}</h3>
                         <p className="text-sm text-muted-foreground">{item.description}</p>
                       </>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    {editingItem !== item.id && (
+                    {editingItem !== item._id && (
                       <div className="text-xl font-orbitron font-bold text-success">
                         ${item.price}
                       </div>
                     )}
-                    {editingItem !== item.id && isAdmin && (
-                      <div className="flex gap-1">
+                    {isAdmin && editingItem !== item._id && (
+                      <>
                         <Button
+                          variant="ghost"
                           size="sm"
-                          variant="outline"
-                          onClick={() => setEditingItem(item.id)}
-                          className="btn-gang-outline"
+                          onClick={() => setEditingItem(item._id!)}
+                          className="hover:bg-primary/10"
                         >
-                          <Edit className="w-3 h-3" />
+                          <Edit className="w-4 h-4" />
                         </Button>
                         <Button
+                          variant="ghost"
                           size="sm"
-                          variant="destructive"
-                          onClick={() => deleteItem(item.id)}
-                          className="bg-destructive hover:bg-destructive/80"
+                          onClick={() => deleteItem(item._id!)}
+                          className="hover:bg-destructive/10 text-destructive"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
               </div>
             ))}
           </div>
-          
+
           {/* Add New Item (Admin Only) */}
           {isAdmin && (
             <Card className="border-dashed border-2 border-border/50">
@@ -479,7 +472,7 @@ export const OrdersTab = (props: OrdersTabProps) => {
               className="px-3 py-2 bg-input border border-border rounded-md text-foreground"
             >
               {availableItems.map(item => (
-                <option key={item.id} value={item.id}>
+                <option key={item._id} value={item._id}>
                   {item.name} (${item.price})
                 </option>
               ))}
@@ -511,66 +504,80 @@ export const OrdersTab = (props: OrdersTabProps) => {
           {orders.length === 0 ? (
             <p className="text-muted-foreground text-center">No orders placed yet.</p>
           ) : (
-            orders.map(order => (
-              <div
-                key={order.id}
-                className="p-4 border border-border rounded-lg bg-muted/50"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
-                  <div className="font-bold font-rajdhani text-lg text-success">
-                    {order.memberName}
+            orders.map((order) => (
+              <div key={order._id} className="p-4 bg-muted/50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h3 className="font-semibold">{order.memberName}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {new Date(order.orderDate).toLocaleDateString()}
+                    </p>
                   </div>
-                  <div>{getStatusBadge(order.status)}</div>
+                  <Badge 
+                    className={
+                      order.status === 'pending' ? 'bg-warning text-warning-foreground' :
+                      order.status === 'approved' ? 'bg-info text-info-foreground' :
+                      order.status === 'completed' ? 'bg-success text-success-foreground' :
+                      'bg-destructive text-destructive-foreground'
+                    }
+                  >
+                    {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                  </Badge>
                 </div>
-                <div className="mb-2">
-                  <ul className="list-disc list-inside">
-                    {order.items.map(item => (
-                      <li key={item.itemId} className="font-rajdhani font-medium">
-                        {item.itemName} × {item.quantity} (${(item.price * item.quantity).toFixed(2)})
-                      </li>
-                    ))}
-                  </ul>
+                
+                <div className="space-y-1 mb-3">
+                  {order.items.map((item, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span>{item.quantity}x {item.itemName}</span>
+                      <span>${(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
                 </div>
-                <div className="text-right font-orbitron font-bold text-lg text-gang-glow">
-                  Total: ${order.totalAmount.toFixed(2)}
+                
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold">Total:</span>
+                  <span className="text-xl font-orbitron font-bold text-success">
+                    ${order.totalAmount.toFixed(2)}
+                  </span>
                 </div>
-
-                {/* Controls to update status (Admin Only) */}
+                
                 {isAdmin && (
-                  <div className="mt-3 flex gap-2 flex-wrap">
-                    {order.status === "pending" && (
+                  <div className="flex gap-2 mt-3">
+                    {order.status === 'pending' && (
                       <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="btn-gang-outline"
-                          onClick={() => updateOrderStatus(order.id, "approved")}
+                        <Button 
+                          size="sm" 
+                          onClick={() => updateOrderStatus(order._id!, 'approved')}
+                          className="bg-info hover:bg-info/80"
                         >
+                          <CheckCircle className="w-4 h-4 mr-1" />
                           Approve
                         </Button>
-                        <Button
-                          size="sm"
+                        <Button 
+                          size="sm" 
                           variant="destructive"
-                          onClick={() => updateOrderStatus(order.id, "cancelled")}
+                          onClick={() => deleteOrder(order._id!)}
                         >
-                          Cancel
+                          <AlertTriangle className="w-4 h-4 mr-1" />
+                          Reject
                         </Button>
                       </>
                     )}
-
-                    {order.status === "approved" && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={() => updateOrderStatus(order.id, "completed")}
+                    {order.status === 'approved' && (
+                      <Button 
+                        size="sm" 
+                        onClick={() => updateOrderStatus(order._id!, 'completed')}
+                        className="bg-success hover:bg-success/80"
                       >
-                        Complete
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Mark Complete
                       </Button>
                     )}
                   </div>
                 )}
               </div>
             ))
+
           )}
         </CardContent>
       </Card>

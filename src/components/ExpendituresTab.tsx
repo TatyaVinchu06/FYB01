@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, TrendingDown, DollarSign, Calendar, TrendingUp, Save, Trash2, Edit } from "lucide-react";
-import { supabaseService as firestoreService, Transaction } from "@/lib/supabaseService";
+import { mongoService as firestoreService, Transaction } from "@/lib/mongoService";
 
 
 interface ExpendituresTabProps {
@@ -22,7 +22,7 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
     category: "operation"
   });
 
-  // Fetch data from Supabase
+  // Fetch data from MongoDB
   useEffect(() => {
     let isCancelled = false;
     
@@ -53,17 +53,13 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
     
     fetchData();
     
-    // Set up real-time subscription if supported
-    const unsubscribe = firestoreService.subscribeToTransactions((newTransactions) => {
-      if (!isCancelled) {
-        setTransactions(newTransactions);
-      }
-    });
+    // Poll for updates every 30 seconds since MongoDB doesn't have real-time subscriptions
+    const intervalId = setInterval(fetchData, 30000);
 
     return () => {
       isCancelled = true;
       clearTimeout(timeoutId);
-      unsubscribe();
+      clearInterval(intervalId);
     };
   }, []);
 
@@ -79,6 +75,9 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
       try {
         await firestoreService.addTransaction(transaction);
         setNewTransaction({ description: "", amount: "", type: "expense", category: "operation" });
+        // Refresh data after adding
+        const updatedTransactions = await firestoreService.getTransactions();
+        setTransactions(updatedTransactions);
       } catch (error) {
         console.error('Error adding transaction:', error);
       }
@@ -88,6 +87,9 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
   const deleteTransaction = async (transactionId: string) => {
     try {
       await firestoreService.deleteTransaction(transactionId);
+      // Refresh data after deleting
+      const updatedTransactions = await firestoreService.getTransactions();
+      setTransactions(updatedTransactions);
     } catch (error) {
       console.error('Error deleting transaction:', error);
     }
@@ -128,7 +130,7 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading transactions...</p>
           {loadError && (
-            <p className="text-destructive mt-2">Error loading data. Please check your Firebase connection.</p>
+            <p className="text-destructive mt-2">Error loading data. Please check your MongoDB connection.</p>
           )}
         </div>
       </div>
@@ -198,115 +200,135 @@ export const ExpendituresTab = ({ isAdmin }: ExpendituresTabProps) => {
               💰 Record New Transaction
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <Input
-                placeholder="Transaction description"
-                value={newTransaction.description}
-                onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
-                className="bg-input md:col-span-2"
-              />
-              <Input
-                type="number"
-                placeholder="Amount ($)"
-                value={newTransaction.amount}
-                onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
-                className="bg-input"
-              />
-              <select
-                value={newTransaction.type}
-                onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value as Transaction['type']})}
-                className="px-3 py-2 bg-input border border-border rounded-md text-foreground"
-              >
-                <option value="expense">💸 Expense</option>
-                <option value="income">💰 Income</option>
-              </select>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="lg:col-span-2">
+                <label className="block text-sm font-medium mb-2">Description</label>
+                <Input
+                  value={newTransaction.description}
+                  onChange={(e) => setNewTransaction({...newTransaction, description: e.target.value})}
+                  placeholder="What was this transaction for?"
+                  className="bg-input"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Amount ($)</label>
+                <Input
+                  type="number"
+                  value={newTransaction.amount}
+                  onChange={(e) => setNewTransaction({...newTransaction, amount: e.target.value})}
+                  placeholder="0.00"
+                  className="bg-input"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Type</label>
+                <select
+                  value={newTransaction.type}
+                  onChange={(e) => setNewTransaction({...newTransaction, type: e.target.value as any})}
+                  className="w-full p-2 rounded-md border border-input bg-background text-foreground"
+                >
+                  <option value="expense">💸 Expense</option>
+                  <option value="income">💰 Income</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Category</label>
+                <select
+                  value={newTransaction.category}
+                  onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
+                  className="w-full p-2 rounded-md border border-input bg-background text-foreground"
+                >
+                  <option value="operation">🏠 Operations</option>
+                  <option value="equipment">🔫 Equipment</option>
+                  <option value="maintenance">🔧 Maintenance</option>
+                  <option value="contribution">💵 Contribution</option>
+                  <option value="other">📋 Other</option>
+                </select>
+              </div>
             </div>
             
-            <div className="flex gap-3">
-              <select
-                value={newTransaction.category}
-                onChange={(e) => setNewTransaction({...newTransaction, category: e.target.value})}
-                className="flex-1 px-3 py-2 bg-input border border-border rounded-md text-foreground"
-              >
-                <option value="operation">🏠 Operations</option>
-                <option value="equipment">🔫 Equipment</option>
-                <option value="maintenance">🔧 Maintenance</option>
-                <option value="contribution">💵 Contribution</option>
-                <option value="other">📋 Other</option>
-              </select>
-              
-              <Button onClick={addTransaction} className="btn-gang">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Transaction
-              </Button>
-            </div>
+            <Button 
+              onClick={addTransaction}
+              className="mt-4 btn-gang"
+              disabled={!newTransaction.description.trim() || !newTransaction.amount}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Transaction
+            </Button>
           </CardContent>
         </Card>
       )}
 
-      {/* Transactions List */}
+      {/* Recent Transactions */}
       <Card className="card-gang">
         <CardHeader>
-          <CardTitle className="font-orbitron text-gang-glow">
-            💰 Gang Fund Activity
+          <CardTitle className="font-orbitron text-gang-glow flex items-center">
+            <Calendar className="w-5 h-5 mr-2" />
+            Recent Transactions
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {transactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="flex items-center gap-2">
-                      {transaction.type === 'income' ? (
-                        <TrendingUp className="w-4 h-4 text-success" />
-                      ) : (
-                        <TrendingDown className="w-4 h-4 text-destructive" />
-                      )}
-                      <h3 className="font-rajdhani font-bold">{transaction.description}</h3>
-                    </div>
-                    {getCategoryBadge(transaction.category)}
-                  </div>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Calendar className="w-3 h-3 mr-1" />
-                    {new Date(transaction.date).toLocaleDateString()}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className={`text-xl font-orbitron font-bold flex items-center ${
-                      transaction.type === 'income' ? 'text-success' : 'text-destructive'
-                    }`}>
-                      <DollarSign className="w-4 h-4" />
-                      {transaction.type === 'income' ? '+' : '-'}{transaction.amount.toLocaleString()}
+          {transactions.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <DollarSign className="w-12 h-12 mx-auto mb-4 opacity-50" />
+              <p>No transactions recorded yet</p>
+              <p className="text-sm mt-2">Add your first transaction above</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {transactions.map((transaction) => (
+                <div
+                  key={transaction._id}
+                  className="flex items-center justify-between p-4 rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-full ${
+                        transaction.type === 'income' ? 'bg-success/20 text-success' : 'bg-destructive/20 text-destructive'
+                      }`}>
+                        {transaction.type === 'income' ? (
+                          <TrendingUp className="w-4 h-4" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{transaction.description}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-sm text-muted-foreground">
+                            {new Date(transaction.date).toLocaleDateString()}
+                          </span>
+                          {getCategoryBadge(transaction.category)}
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
-                  {isAdmin && (
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => deleteTransaction(transaction.id)}
-                      className="bg-destructive hover:bg-destructive/80"
-                      title="Delete this transaction (if it was added by mistake)"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <div className={`text-right font-orbitron font-bold ${
+                      transaction.type === 'income' ? 'text-success' : 'text-destructive'
+                    }`}>
+                      {transaction.type === 'income' ? '+' : '-'}${transaction.amount.toFixed(2)}
+                    </div>
+                    
+                    {isAdmin && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => deleteTransaction(transaction._id!)}
+                        className="bg-destructive hover:bg-destructive/80"
+                        title="Delete this transaction (if it was added by mistake)"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-
-          {transactions.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              <TrendingDown className="w-12 h-12 mx-auto mb-3 opacity-50" />
-              <p>No transactions recorded yet. Clean books! 📚</p>
+              ))}
             </div>
           )}
         </CardContent>

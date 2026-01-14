@@ -34,7 +34,7 @@ import {
   TrashIcon,
   PlusIcon
 } from "@radix-ui/react-icons";
-import { supabaseService as firestoreService, Transaction, Member, GangFund, Order, WeeklyPaymentRecord } from "@/lib/supabaseService";
+import { mongoService as firestoreService, Transaction, Member, GangFund, Order, WeeklyPaymentRecord } from "@/lib/mongoService";
 
 interface MembersTabProps {
   isAdmin: boolean;

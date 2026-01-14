@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { ShoppingCart, Package, Clock, CheckCircle, AlertTriangle, Plus, Edit, Trash2, Save } from "lucide-react";
-import { mongoService as firestoreService, Transaction, Item, Order } from "@/lib/mongoService";
+import { supabaseService as firestoreService, Transaction, Item, Order } from "@/lib/supabaseService";
 
 // EditItemForm component to handle item editing safely
 interface EditItemFormProps {

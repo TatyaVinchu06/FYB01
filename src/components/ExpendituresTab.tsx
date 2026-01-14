@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Plus, TrendingDown, DollarSign, Calendar, TrendingUp, Save, Trash2, Edit } from "lucide-react";
-import { mongoService as firestoreService, Transaction } from "@/lib/mongoService";
+import { supabaseService as firestoreService, Transaction } from "@/lib/supabaseService";
 
 
 interface ExpendituresTabProps {
